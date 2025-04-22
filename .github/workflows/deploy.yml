@@ -49,7 +49,7 @@ pytest-cov==4.1.0' > requirements.txt
             # 파이썬 소스 복사
             cp -r ~/aiot2-team3/ai-prediction/* . || echo "No source files to copy"
 
-            # 공통 docker-compose.yml에 서비스 추가
+            # 공통 docker-compose.yml에 AI 서비스 추가
             cd ~/docker
             if ! grep -q "ai-prediction:" docker-compose.yml; then
               cp docker-compose.yml docker-compose.yml.bak
