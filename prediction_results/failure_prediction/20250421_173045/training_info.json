@@ -1,7 +1,0 @@
-{
-    "last_training_time": "2025-04-21 17:30:40",
-    "epochs": 50,
-    "final_loss": 0.0030191384721547365,
-    "final_accuracy": 1.0,
-    "model_save_path": "model_weights/failure_lstm.h5"
-}
