@@ -1,26 +1,34 @@
-project/
-├── models/
+ai-prediction/
+├── .github/                   # GitHub 관련 설정
+│   └── workflows/             # GitHub Actions 워크플로우
+│       └── deploy.yml         # CI/CD 파이프라인 설정
+├── data/                      # 데이터 파일 디렉토리
+│   └── ...                    # CSV 파일들 (필요시)
+├── logs/                      # 로그 디렉토리
+├── model_weights/             # 모델 가중치 저장 디렉토리
+├── prediction_results/        # 예측 결과 저장 디렉토리
+├── models/                    # 머신러닝 모델 정의
 │   ├── __init__.py
-│   ├── base_model.py           # 모델의 기본 인터페이스 정의
-│   └── lstm_model.py           # LSTM 기반 예측 모델 구현
-├── utils/
+│   ├── base_model.py          # 모델 기본 인터페이스
+│   └── lstm_model.py          # LSTM 기반 예측 모델
+├── predictors/                # 예측 로직
 │   ├── __init__.py
-│   ├── data_loader.py          # 데이터 로드 함수들(확장됨)
-│   ├── preprocessing.py        # 데이터 전처리 전용 기능
-│   ├── db_utils.py             # DB 연결 및 쿼리 기능
-│   ├── visualization.py        # 시각화 함수
-│   └── config_utils.py         # 설정 관리 기능
-├── predictors/                 
+│   ├── failure_predictor.py   # 고장 예측 로직
+│   └── resource_predictor.py  # 자원 사용량 예측 로직
+├── utils/                     # 유틸리티 함수
 │   ├── __init__.py
-│   ├── failure_predictor.py    # 고장 예측 로직
-│   └── resource_predictor.py   # 자원 사용량 예측 로직
-├── data/                       # 원본 데이터 파일 디렉토리
-│   ├── cpu_usageUser.csv
-│   ├── cpu_usageSystem.csv
-│   └── ...
-├── model_weights/              # 학습된 모델 가중치 저장 디렉토리
-├── logs/                       # 로그 파일 디렉토리
-├── prediction_results/         # 예측 결과 저장 디렉토리
-├── run_prediction.py           # 메인 실행 파일
-├── config.json                 # 설정 파일
-└── requirements.txt            # 패키지 의존성 목록
+│   ├── api_sender.py          # API 결과 전송 유틸리티
+│   ├── batch_monitor.py       # 배치 작업 모니터링
+│   ├── data_loader.py         # 데이터 로드 함수
+│   ├── db_utils.py            # DB 연결 및 쿼리 기능
+│   ├── env_loader.py          # 환경 변수 로드 기능
+│   ├── preprocessing.py       # 데이터 전처리 기능
+│   └── visualization.py       # 시각화 함수
+├── tests/                     # 테스트 코드
+│   └── test_prediction.py     # 예측 시스템 테스트
+├── batch_runner.py            # 배치 작업 실행 관리자
+├── config.json                # 설정 파일
+├── db_connection_test.py      # 데이터베이스 연결 테스트
+├── Dockerfile                 # Docker 이미지 정의
+├── requirements.txt           # Python 패키지 의존성
+└── run_batch.py               # 메인 실행 스크립트

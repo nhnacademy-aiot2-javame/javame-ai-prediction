@@ -1,0 +1,142 @@
+# ai-prediction/.github/workflows/deploy.yml
+name: AI Prediction CI/CD
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '배포 환경 (dev/prod)'
+        required: true
+        default: 'dev'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install pytest pytest-cov
+
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        # 중요한 오류만 체크
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Run unit tests
+      run: |
+        pytest --cov=./ --cov-report=xml
+    
+    - name: Build Docker image
+      run: |
+        docker build -t javame-ai-prediction:${{ github.sha }} .
+    
+    - name: Save Docker image
+      run: |
+        docker save javame-ai-prediction:${{ github.sha }} > image.tar
+    
+    - name: Archive Docker image
+      uses: actions/upload-artifact@v3
+      with:
+        name: ai-prediction-image
+        path: image.tar
+        retention-days: 1
+
+  deploy-dev:
+    needs: build-and-test
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+    runs-on: ubuntu-latest
+    environment: development
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download Docker image
+      uses: actions/download-artifact@v3
+      with:
+        name: ai-prediction-image
+        path: .
+    
+    - name: Deploy to development server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.DEV_SERVER_HOST }}
+        username: ${{ secrets.DEV_SERVER_USER }}
+        key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+        script: |
+          mkdir -p /tmp/deploy
+          # 이미지 파일 복사
+          scp ${{ github.workspace }}/image.tar /tmp/deploy/
+          
+          # 이미지 로드
+          docker load < /tmp/deploy/image.tar
+          docker tag javame-ai-prediction:${{ github.sha }} javame-ai-prediction:latest
+          
+          # 프로젝트 디렉토리로 이동
+          cd /home/aiot2-team3/docker
+          
+          # 기존 서비스 중지 및 새 이미지로 업데이트
+          docker-compose stop ai-prediction
+          docker-compose rm -f ai-prediction
+          docker-compose up -d ai-prediction
+          
+          # 임시 파일 정리
+          rm -rf /tmp/deploy
+          docker image prune -f
+
+  deploy-prod:
+    needs: build-and-test
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download Docker image
+      uses: actions/download-artifact@v3
+      with:
+        name: ai-prediction-image
+        path: .
+    
+    - name: Deploy to production server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.PROD_SERVER_HOST }}
+        username: ${{ secrets.PROD_SERVER_USER }}
+        key: ${{ secrets.PROD_SERVER_SSH_KEY }}
+        script: |
+          mkdir -p /tmp/deploy
+          # 이미지 파일 복사
+          scp ${{ github.workspace }}/image.tar /tmp/deploy/
+          
+          # 이미지 로드
+          docker load < /tmp/deploy/image.tar
+          docker tag javame-ai-prediction:${{ github.sha }} javame-ai-prediction:latest
+          
+          # 프로젝트 디렉토리로 이동
+          cd /home/aiot2-team3/docker
+          
+          # 기존 서비스 중지 및 새 이미지로 업데이트
+          docker-compose stop ai-prediction
+          docker-compose rm -f ai-prediction
+          docker-compose up -d ai-prediction
+          
+          # 임시 파일 정리
+          rm -rf /tmp/deploy
+          docker image prune -f
