@@ -19,7 +19,7 @@ jobs:
           source: "ai-prediction/"
           target: "~"
           
-      - name: Update docker-compose and deploy
+      - name: Deploy AI prediction service
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_IP }}
@@ -28,44 +28,33 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           script: |
             cd ~/docker
-            
-            # docker-compose.yml에 ai-prediction 서비스 추가
-            if ! grep -q "ai-prediction:" docker-compose.yml; then
-              echo "Adding ai-prediction service to docker-compose.yml"
-              cp docker-compose.yml docker-compose.yml.bak
-              
-              # 단일 파일로 저장
-              echo "  ai-prediction:
-    build: 
-      context: ../ai-prediction
-      dockerfile: Dockerfile
-    container_name: javame-ai-prediction
-    environment:
-      - INFLUXDB_URL=http://influxdb:8086
-      - INFLUXDB_TOKEN=g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==
-      - INFLUXDB_ORG=javame
-      - INFLUXDB_BUCKET=aiot
-      - PREDICTION_INTERVAL=6
-    volumes:
-      - ../ai-prediction:/app
-    networks:
-      - javame-network
-    restart: unless-stopped
-    depends_on:
-      - influxdb" > ai-prediction-service.txt
-              
-              # volumes: 라인 앞에 삽입
-              sed -i '/^volumes:/i\\' docker-compose.yml
-              sed -i '/^volumes:/e cat ai-prediction-service.txt' docker-compose.yml
-              rm ai-prediction-service.txt
-            else
-              echo "ai-prediction service already exists in docker-compose.yml"
-            fi
+            echo 'version: "3.8"' > docker-compose-ai.yml
+            echo 'services:' >> docker-compose-ai.yml
+            echo '  ai-prediction:' >> docker-compose-ai.yml
+            echo '    build:' >> docker-compose-ai.yml 
+            echo '      context: ../ai-prediction' >> docker-compose-ai.yml
+            echo '      dockerfile: Dockerfile' >> docker-compose-ai.yml
+            echo '    container_name: javame-ai-prediction' >> docker-compose-ai.yml
+            echo '    environment:' >> docker-compose-ai.yml
+            echo '      - INFLUXDB_URL=http://influxdb:8086' >> docker-compose-ai.yml
+            echo '      - INFLUXDB_TOKEN=g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==' >> docker-compose-ai.yml
+            echo '      - INFLUXDB_ORG=javame' >> docker-compose-ai.yml
+            echo '      - INFLUXDB_BUCKET=aiot' >> docker-compose-ai.yml
+            echo '      - PREDICTION_INTERVAL=6' >> docker-compose-ai.yml
+            echo '    volumes:' >> docker-compose-ai.yml
+            echo '      - ../ai-prediction:/app' >> docker-compose-ai.yml
+            echo '    networks:' >> docker-compose-ai.yml
+            echo '      - javame-network' >> docker-compose-ai.yml
+            echo '    restart: unless-stopped' >> docker-compose-ai.yml
+            echo '    depends_on:' >> docker-compose-ai.yml
+            echo '      - influxdb' >> docker-compose-ai.yml
+            echo 'networks:' >> docker-compose-ai.yml
+            echo '  javame-network:' >> docker-compose-ai.yml
+            echo '    external: true' >> docker-compose-ai.yml
             
             # 서비스 빌드 및 시작
-            docker-compose build ai-prediction
-            docker-compose up -d ai-prediction
+            docker-compose -f docker-compose-ai.yml build
+            docker-compose -f docker-compose-ai.yml up -d
             
             # 배포 확인
-            docker-compose ps | grep ai-prediction || echo "ai-prediction service not running"
-            docker-compose logs --tail=20 ai-prediction
+            docker-compose -f docker-compose-ai.yml ps
