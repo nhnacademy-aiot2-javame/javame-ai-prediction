@@ -1,0 +1,57 @@
+{
+    "influxdb": {
+        "url": "http://localhost:8086",
+        "token": "PcE26YqzAR0YKYBI_v7jFtm1OvWEV_TcboG_pm_v5yWTNrGUg5whgmSp5eE6fqCDoJqrHONESvNWqbqKrKITtg==",
+        "org": "seongO",
+        "bucket": "asd",
+        "measurements": [
+            "system",
+            "cpu",
+            "memory",
+            "disk",
+            "sensors"
+        ],
+        "measurement": "system"
+    },
+    "mysql": {
+        "host": "220.67.216.14",
+        "port": 13306,
+        "user": "nhn_academy_221",
+        "password": "kK8ujeoz!",
+        "database": "nhn_academy_221"
+    },
+    "failure_prediction": {
+        "enabled": true,
+        "interval_hours": 6,
+        "input_window": 360,
+        "target_column": "temp_input",
+        "threshold": 0.75
+    },
+    "resource_analysis": {
+        "enabled": true,
+        "interval_hours": 12,
+        "input_window": 2520,
+        "target_column": "user",
+        "capacity_threshold": 80
+    },
+    "results": {
+        "save_dir": "prediction_results",
+        "save_plots": true,
+        "save_csv": true,
+        "model_dir": "model_weights",
+        "log_dir": "logs"
+    },
+    "logging": {
+        "level": "INFO",
+        "log_file": "logs/iot_prediction.log",
+        "training_log_dir": "logs/training_logs",
+        "max_size_mb": 10,
+        "backup_count": 5
+    },
+    "test": {
+        "enabled": true,
+        "days": 30,
+        "hour_interval": 1,
+        "device_count": 1
+    }
+}

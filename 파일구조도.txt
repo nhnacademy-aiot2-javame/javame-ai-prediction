@@ -1,0 +1,26 @@
+project/
+├── models/
+│   ├── __init__.py
+│   ├── base_model.py           # 모델의 기본 인터페이스 정의
+│   └── lstm_model.py           # LSTM 기반 예측 모델 구현
+├── utils/
+│   ├── __init__.py
+│   ├── data_loader.py          # 데이터 로드 함수들(확장됨)
+│   ├── preprocessing.py        # 데이터 전처리 전용 기능
+│   ├── db_utils.py             # DB 연결 및 쿼리 기능
+│   ├── visualization.py        # 시각화 함수
+│   └── config_utils.py         # 설정 관리 기능
+├── predictors/                 
+│   ├── __init__.py
+│   ├── failure_predictor.py    # 고장 예측 로직
+│   └── resource_predictor.py   # 자원 사용량 예측 로직
+├── data/                       # 원본 데이터 파일 디렉토리
+│   ├── cpu_usageUser.csv
+│   ├── cpu_usageSystem.csv
+│   └── ...
+├── model_weights/              # 학습된 모델 가중치 저장 디렉토리
+├── logs/                       # 로그 파일 디렉토리
+├── prediction_results/         # 예측 결과 저장 디렉토리
+├── run_prediction.py           # 메인 실행 파일
+├── config.json                 # 설정 파일
+└── requirements.txt            # 패키지 의존성 목록

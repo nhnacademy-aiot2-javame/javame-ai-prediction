@@ -1,0 +1,2 @@
+timestamp,failure_probability,is_failure_predicted,device_id,prediction_time
+2025-04-21 01:34:11+00:00,0.004298326,False,device_001,2025-04-21 17:31:39.360696

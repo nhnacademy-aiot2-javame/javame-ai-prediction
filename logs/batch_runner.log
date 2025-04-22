@@ -1,0 +1,186 @@
+2025-04-22 11:07:56,070 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 11:07:56,070 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 11:07:56,070 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 11:07:56,070 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 11:07:56,070 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 11:14:02,574 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 11:14:02,574 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 11:14:02,575 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 11:14:02,575 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 11:14:02,575 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 13:21:23,453 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:21:23,453 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:21:23,453 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:21:23,453 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:21:23,453 - root - INFO - 단일 실행 모드로 실행합니다. (모드: all)
+2025-04-22 13:21:23,463 - utils.batch_monitor - ERROR - MySQL 연결 실패: 2005 (HY000): Unknown MySQL server host 'mysql' (-3)
+2025-04-22 13:21:23,463 - utils.batch_monitor - ERROR - 배치 작업 실행 중 오류 발생: name 'logger' is not defined
+2025-04-22 13:21:23,464 - utils.batch_monitor - ERROR - Traceback (most recent call last):
+  File "/home/nhnacademy/Desktop/프로젝트 준비/influxAi/utils/batch_monitor.py", line 267, in wrapper
+    result = func(mode, *args, **kwargs)
+  File "/home/nhnacademy/Desktop/프로젝트 준비/influxAi/batch_runner.py", line 173, in run_prediction_job
+    logger.info(f"===== 예측 작업 시작 (모드: {mode}) =====")
+NameError: name 'logger' is not defined
+
+2025-04-22 13:21:23,465 - utils.batch_monitor - INFO - 배치 작업 실행 시간: 0.00초
+2025-04-22 13:21:23,465 - root - ERROR - 예측 작업 'all' 모드 실행 실패.
+2025-04-22 13:21:36,975 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:21:36,975 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:21:36,975 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:21:36,975 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:21:36,975 - root - INFO - 테스트 모드로 실행합니다.
+2025-04-22 13:21:36,984 - root - INFO - 단일 실행 모드로 실행합니다. (모드: all)
+2025-04-22 13:21:36,985 - utils.batch_monitor - ERROR - MySQL 연결 실패: 2005 (HY000): Unknown MySQL server host 'mysql' (-3)
+2025-04-22 13:21:36,985 - utils.batch_monitor - ERROR - 배치 작업 실행 중 오류 발생: name 'logger' is not defined
+2025-04-22 13:21:36,986 - utils.batch_monitor - ERROR - Traceback (most recent call last):
+  File "/home/nhnacademy/Desktop/프로젝트 준비/influxAi/utils/batch_monitor.py", line 267, in wrapper
+    result = func(mode, *args, **kwargs)
+  File "/home/nhnacademy/Desktop/프로젝트 준비/influxAi/batch_runner.py", line 173, in run_prediction_job
+    logger.info(f"===== 예측 작업 시작 (모드: {mode}) =====")
+NameError: name 'logger' is not defined
+
+2025-04-22 13:21:36,986 - utils.batch_monitor - INFO - 배치 작업 실행 시간: 0.00초
+2025-04-22 13:21:36,986 - root - ERROR - 예측 작업 'all' 모드 실행 실패.
+2025-04-22 13:22:14,095 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:22:14,095 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:22:14,103 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:22:14,104 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:22:14,104 - root - INFO - 단일 실행 모드로 실행합니다. (모드: all)
+2025-04-22 13:22:14,105 - utils.batch_monitor - ERROR - MySQL 연결 실패: 2005 (HY000): Unknown MySQL server host 'mysql' (-3)
+2025-04-22 13:22:14,105 - utils.batch_monitor - ERROR - 배치 작업 실행 중 오류 발생: name 'logger' is not defined
+2025-04-22 13:22:14,106 - utils.batch_monitor - ERROR - Traceback (most recent call last):
+  File "/home/nhnacademy/Desktop/프로젝트 준비/influxAi/utils/batch_monitor.py", line 267, in wrapper
+    result = func(mode, *args, **kwargs)
+  File "/home/nhnacademy/Desktop/프로젝트 준비/influxAi/batch_runner.py", line 173, in run_prediction_job
+    logger.info(f"===== 예측 작업 시작 (모드: {mode}) =====")
+NameError: name 'logger' is not defined
+
+2025-04-22 13:22:14,106 - utils.batch_monitor - INFO - 배치 작업 실행 시간: 0.00초
+2025-04-22 13:22:14,106 - root - ERROR - 예측 작업 'all' 모드 실행 실패.
+2025-04-22 13:29:10,553 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:29:10,553 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:29:10,553 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:29:10,553 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:29:10,553 - root - INFO - 단일 실행 모드로 실행합니다. (모드: all)
+2025-04-22 13:29:10,554 - utils.batch_monitor - ERROR - MySQL 연결 실패: 2005 (HY000): Unknown MySQL server host 'mysql' (-3)
+2025-04-22 13:29:10,555 - batch_runner - INFO - ===== 예측 작업 시작 (모드: all) =====
+2025-04-22 13:29:10,555 - batch_runner - INFO - 예측 작업 실행 중 (시도 1/4): python run_prediction.py --mode all --config config.json --schedule
+2025-04-22 13:29:10,555 - batch_runner - WARNING - 예측 작업 실패 (종료 코드: 32512)
+2025-04-22 13:29:10,556 - batch_runner - INFO - 60초 후 재시도...
+2025-04-22 13:30:20,836 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:30:20,836 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:30:20,839 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:30:20,839 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:30:20,839 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 13:30:20,839 - batch_runner - INFO - 데이터베이스 연결 테스트 중...
+2025-04-22 13:30:20,840 - batch_runner - ERROR - 데이터베이스 연결 테스트 실패 (종료 코드: 32512)
+2025-04-22 13:30:20,840 - root - ERROR - 데이터베이스 연결 테스트 실패.
+2025-04-22 13:34:34,104 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:34:34,104 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:34:34,104 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:34:34,104 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:34:34,104 - root - INFO - 테스트 모드로 실행합니다.
+2025-04-22 13:34:34,113 - root - INFO - 단일 실행 모드로 실행합니다. (모드: all)
+2025-04-22 13:34:34,114 - utils.batch_monitor - ERROR - MySQL 연결 실패: 2005 (HY000): Unknown MySQL server host 'mysql' (-3)
+2025-04-22 13:34:34,114 - batch_runner - INFO - ===== 예측 작업 시작 (모드: all) =====
+2025-04-22 13:34:34,114 - batch_runner - INFO - 예측 작업 실행 중 (시도 1/4): python run_prediction.py --mode all --config config.json --schedule
+2025-04-22 13:34:34,115 - batch_runner - WARNING - 예측 작업 실패 (종료 코드: 32512)
+2025-04-22 13:34:34,115 - batch_runner - INFO - 60초 후 재시도...
+2025-04-22 13:35:34,175 - batch_runner - INFO - 예측 작업 실행 중 (시도 2/4): python run_prediction.py --mode all --config config.json --schedule
+2025-04-22 13:35:34,178 - batch_runner - WARNING - 예측 작업 실패 (종료 코드: 32512)
+2025-04-22 13:35:34,178 - batch_runner - INFO - 60초 후 재시도...
+2025-04-22 13:36:34,202 - batch_runner - INFO - 예측 작업 실행 중 (시도 3/4): python run_prediction.py --mode all --config config.json --schedule
+2025-04-22 13:36:34,205 - batch_runner - WARNING - 예측 작업 실패 (종료 코드: 32512)
+2025-04-22 13:36:34,206 - batch_runner - INFO - 60초 후 재시도...
+2025-04-22 13:37:34,247 - batch_runner - INFO - 예측 작업 실행 중 (시도 4/4): python run_prediction.py --mode all --config config.json --schedule
+2025-04-22 13:37:34,250 - batch_runner - WARNING - 예측 작업 실패 (종료 코드: 32512)
+2025-04-22 13:37:34,250 - batch_runner - ERROR - 최대 재시도 횟수 초과. 작업 실패 (모드: all)
+2025-04-22 13:37:34,250 - utils.batch_monitor - INFO - 배치 작업 실행 시간: 180.14초
+2025-04-22 13:37:34,250 - root - ERROR - 예측 작업 'all' 모드 실행 실패.
+2025-04-22 13:40:26,609 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:40:26,609 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:40:26,609 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:40:26,609 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:40:26,609 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 13:40:26,609 - batch_runner - INFO - 데이터베이스 연결 테스트 중...
+2025-04-22 13:40:26,611 - batch_runner - ERROR - 데이터베이스 연결 테스트 실패 (종료 코드: 32512)
+2025-04-22 13:40:26,611 - root - ERROR - 데이터베이스 연결 테스트 실패.
+2025-04-22 13:46:51,009 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:46:51,009 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:46:51,009 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:46:51,009 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:46:51,009 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 13:46:51,009 - batch_runner - INFO - 데이터베이스 연결 테스트 중...
+2025-04-22 13:46:51,010 - batch_runner - ERROR - 데이터베이스 연결 테스트 실패 (종료 코드: 32512)
+2025-04-22 13:46:51,010 - root - ERROR - 데이터베이스 연결 테스트 실패.
+2025-04-22 13:48:06,750 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:48:06,751 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:48:06,751 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:48:06,751 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:48:06,751 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 13:48:06,751 - batch_runner - INFO - 데이터베이스 연결 테스트 중...
+2025-04-22 13:48:06,752 - batch_runner - ERROR - 데이터베이스 연결 테스트 실패 (종료 코드: 32512)
+2025-04-22 13:48:06,752 - root - ERROR - 데이터베이스 연결 테스트 실패.
+2025-04-22 13:49:10,997 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:49:10,997 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:49:10,997 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:49:10,997 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:49:10,997 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 13:49:10,997 - batch_runner - INFO - 데이터베이스 연결 테스트 중...
+2025-04-22 13:49:10,998 - batch_runner - ERROR - 데이터베이스 연결 테스트 실패 (종료 코드: 32512)
+2025-04-22 13:49:10,998 - root - ERROR - 데이터베이스 연결 테스트 실패.
+2025-04-22 13:51:15,647 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:51:15,647 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:51:15,648 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:51:15,648 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:51:15,648 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 13:51:15,648 - batch_runner - INFO - 데이터베이스 연결 테스트 중...
+2025-04-22 13:51:15,649 - batch_runner - ERROR - 데이터베이스 연결 테스트 실패 (종료 코드: 32512)
+2025-04-22 13:51:15,649 - root - ERROR - 데이터베이스 연결 테스트 실패.
+2025-04-22 13:52:39,324 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:52:39,324 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:52:39,324 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:52:39,324 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:52:39,324 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 13:52:39,325 - batch_runner - INFO - 데이터베이스 연결 테스트 중...
+2025-04-22 13:52:39,325 - batch_runner - ERROR - 데이터베이스 연결 테스트 실패 (종료 코드: 32512)
+2025-04-22 13:52:39,325 - root - ERROR - 데이터베이스 연결 테스트 실패.
+2025-04-22 13:52:46,190 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:52:46,191 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:52:46,191 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:52:46,191 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:52:46,191 - root - INFO - 데이터베이스 연결 테스트를 실행합니다.
+2025-04-22 13:52:46,191 - batch_runner - INFO - 데이터베이스 연결 테스트 중...
+2025-04-22 13:52:46,755 - batch_runner - INFO - 데이터베이스 연결 테스트 성공
+2025-04-22 13:52:46,755 - root - INFO - 데이터베이스 연결 테스트 성공.
+2025-04-22 13:53:06,992 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:53:06,992 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:53:06,992 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:53:06,992 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:53:06,992 - root - INFO - 테스트 모드로 실행합니다.
+2025-04-22 13:53:07,001 - root - INFO - 단일 실행 모드로 실행합니다. (모드: all)
+2025-04-22 13:53:07,179 - utils.batch_monitor - ERROR - 실행 시작 로그 기록 실패: 1146 (42S02): Table 'nhn_academy_221.prediction_runs' doesn't exist
+2025-04-22 13:53:07,180 - batch_runner - INFO - ===== 예측 작업 시작 (모드: all) =====
+2025-04-22 13:53:07,180 - batch_runner - INFO - 예측 작업 실행 중 (시도 1/4): python run_prediction.py --mode all --config config.json --schedule
+2025-04-22 13:53:07,181 - batch_runner - WARNING - 예측 작업 실패 (종료 코드: 32512)
+2025-04-22 13:53:07,181 - batch_runner - INFO - 60초 후 재시도...
+2025-04-22 13:54:08,681 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:54:08,681 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:54:08,682 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:54:08,682 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:54:08,682 - root - INFO - 테스트 모드로 실행합니다.
+2025-04-22 13:54:08,690 - root - INFO - 단일 실행 모드로 실행합니다. (모드: all)
+2025-04-22 13:54:08,873 - batch_runner - INFO - ===== 예측 작업 시작 (모드: all) =====
+2025-04-22 13:54:08,873 - batch_runner - INFO - 예측 작업 실행 중 (시도 1/4): python run_prediction.py --mode all --config config.json --schedule
+2025-04-22 13:54:08,876 - batch_runner - WARNING - 예측 작업 실패 (종료 코드: 32512)
+2025-04-22 13:54:08,876 - batch_runner - INFO - 60초 후 재시도...
+2025-04-22 13:55:00,251 - utils.env_loader - INFO - 환경 변수 로드 완료
+2025-04-22 13:55:00,251 - utils.env_loader - INFO - 기존 설정 파일 로드: config.json
+2025-04-22 13:55:00,251 - utils.env_loader - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:55:00,252 - root - INFO - 설정 파일 업데이트 완료: config.json
+2025-04-22 13:55:00,252 - root - INFO - 테스트 모드로 실행합니다.
+2025-04-22 13:55:00,260 - root - INFO - 단일 실행 모드로 실행합니다. (모드: all)
+2025-04-22 13:55:00,410 - batch_runner - INFO - ===== 예측 작업 시작 (모드: all) =====
+2025-04-22 13:55:00,411 - batch_runner - INFO - 예측 작업 실행 중 (시도 1/4): python run_prediction.py --mode all --config config.json --schedule
+2025-04-22 13:55:10,282 - batch_runner - WARNING - 예측 작업 실패 (종료 코드: 2)
+2025-04-22 13:55:10,283 - batch_runner - INFO - 60초 후 재시도...

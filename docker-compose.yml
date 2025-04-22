@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  prediction-batch:
+    build: .
+    container_name: iot-prediction-batch
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./model_weights:/app/model_weights
+      - ./prediction_results:/app/prediction_results
+      - ./config.json:/app/config.json
+    environment:
+      - INFLUXDB_URL=${INFLUXDB_URL}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=${INFLUXDB_ORG}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET}
+      - INFLUXDB_MEASUREMENTS=${INFLUXDB_MEASUREMENTS}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - API_URL=${API_URL}
+      - PREDICTION_INTERVAL=${PREDICTION_INTERVAL}
+      - LOG_LEVEL=${LOG_LEVEL}
+    networks:
+      - prediction-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-proxy
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT}:18080"
+    environment:
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+    command: >
+      --bind-address=0.0.0.0
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+    networks:
+      - prediction-network
+
+networks:
+  prediction-network:
+    driver: bridge
+
+volumes:
+  influxdb-data:
+    depends_on:
+      - influxdb
+      - mysql
+
+  influxdb:
+    image: influxdb:2.0
+    container_name: influxdb
+    restart: unless-stopped
+    ports:
+      - "10288:10288"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_ADMIN_USER}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
+    networks:
+      - prediction-network
