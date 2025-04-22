@@ -8,9 +8,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    steps:
 
-      - uses: actions/checkout@v3
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Setup AI Prediction service
         uses: appleboy/ssh-action@master
@@ -19,69 +20,86 @@ jobs:
           username: ${{ secrets.SSH_ID }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-        # ────────────────────────────────────────────────────────────────────
-        # 여기서부터 script 블록
         script: |
           cd ~
           mkdir -p ai-prediction
           cd ai-prediction
 
-          # Dockerfile 생성 (printf로 한 줄에 개행 처리)
-          printf 'FROM python:3.9-slim\n\n\
-WORKDIR /app\n\n\
-COPY requirements.txt .\n\
-RUN pip install --no-cache-dir -r requirements.txt\n\n\
-COPY . .\n\n\
-CMD ["python", "batch_runner.py"]\n' > Dockerfile
+          # -----------------------------
+          # Dockerfile 생성
+          # -----------------------------
+          cat << 'EOF' > Dockerfile
+FROM python:3.9-slim
 
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["python", "batch_runner.py"]
+EOF
+
+          # -----------------------------
           # requirements.txt 생성
-          printf 'tensorflow==2.10.0\n\
-pandas==1.5.3\n\
-numpy==1.24.3\n\
-scikit-learn==1.2.2\n\
-matplotlib==3.7.1\n\
-seaborn==0.12.2\n\
-prophet==1.1.4\n\
-influxdb-client==1.36.1\n\
-mysql-connector-python==8.0.33\n\
-schedule==1.2.0\n\
-python-dotenv==1.0.0\n\
-pytest==7.3.1\n\
-pytest-cov==4.1.0\n' > requirements.txt
+          # -----------------------------
+          cat << 'EOF' > requirements.txt
+tensorflow==2.10.0
+pandas==1.5.3
+numpy==1.24.3
+scikit-learn==1.2.2
+matplotlib==3.7.1
+seaborn==0.12.2
+prophet==1.1.4
+influxdb-client==1.36.1
+mysql-connector-python==8.0.33
+schedule==1.2.0
+python-dotenv==1.0.0
+pytest==7.3.1
+pytest-cov==4.1.0
+EOF
 
           # 소스 복사
           cp -r ~/aiot2-team3/ai-prediction/* . || echo "No source files to copy"
 
+          # -----------------------------
           # 공통 docker-compose.yml 업데이트
+          # -----------------------------
           cd ~/docker
           if ! grep -q "ai-prediction:" docker-compose.yml; then
             cp docker-compose.yml docker-compose.yml.bak
-            printf '  ai-prediction:\n\
-    build:\n\
-      context: ../ai-prediction\n\
-      dockerfile: Dockerfile\n\
-    container_name: javame-ai-prediction\n\
-    environment:\n\
-      - INFLUXDB_URL=http://localhost:10288\n\
-      - INFLUXDB_TOKEN=g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==\n\
-      - INFLUXDB_ORG=javame\n\
-      - INFLUXDB_BUCKET=aiot\n\
-      - PREDICTION_INTERVAL=6\n\
-    volumes:\n\
-      - ../ai-prediction:/app\n\
-    networks:\n\
-      - javame-network\n\
-    restart: unless-stopped\n\
-    depends_on:\n\
-      - influxdb\n' > ai-prediction-service.txt
-            awk '/restart: unless-stopped$/{print; system("cat ai-prediction-service.txt"); next}1' docker-compose.yml > docker-compose.yml.new
+
+            cat << 'EOF' > ai-prediction-service.txt
+  ai-prediction:
+    build:
+      context: ../ai-prediction
+      dockerfile: Dockerfile
+    container_name: javame-ai-prediction
+    environment:
+      - INFLUXDB_URL=http://localhost:10288
+      - INFLUXDB_TOKEN=g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==
+      - INFLUXDB_ORG=javame
+      - INFLUXDB_BUCKET=aiot
+      - PREDICTION_INTERVAL=6
+    volumes:
+      - ../ai-prediction:/app
+    networks:
+      - javame-network
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+EOF
+
+            awk '/restart: unless-stopped$/{print; system("cat ai-prediction-service.txt"); next}1' docker-compose.yml \
+              > docker-compose.yml.new
             mv docker-compose.yml.new docker-compose.yml
             rm ai-prediction-service.txt
+
             echo "Added ai-prediction service to docker-compose.yml"
           else
             echo "ai-prediction service already exists in docker-compose.yml"
           fi
-        # ────────────────────────────────────────────────────────────────────
 
       - name: Deploy AI Prediction service
         uses: appleboy/ssh-action@master
