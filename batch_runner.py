@@ -79,8 +79,7 @@ def create_or_update_config():
             "url": INFLUXDB_URL,
             "token": INFLUXDB_TOKEN,
             "org": INFLUXDB_ORG,
-            "bucket": INFLUXDB_BUCKET,
-            "measurement": "system"
+            "bucket": INFLUXDB_BUCKET
         },
         "mysql": {
             "host": MYSQL_HOST,

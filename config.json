@@ -1,24 +1,23 @@
 {
     "influxdb": {
-        "url": "http://localhost:8086",
-        "token": "PcE26YqzAR0YKYBI_v7jFtm1OvWEV_TcboG_pm_v5yWTNrGUg5whgmSp5eE6fqCDoJqrHONESvNWqbqKrKITtg==",
-        "org": "seongO",
-        "bucket": "asd",
+        "url": "http://localhost:10288",
+        "token": "g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==",
+        "org": "javame",
+        "bucket": "aiot",
         "measurements": [
             "system",
             "cpu",
             "memory",
             "disk",
             "sensors"
-        ],
-        "measurement": "system"
+        ]
     },
     "mysql": {
-        "host": "220.67.216.14",
-        "port": 13306,
-        "user": "nhn_academy_221",
-        "password": "kK8ujeoz!",
-        "database": "nhn_academy_221"
+        "host": "s4.java21.net",
+        "port": 18080,
+        "user": "aiot02_team3",
+        "password": "ryL7LcSp@Yiz[bR7",
+        "database": "aiot02_team3"
     },
     "failure_prediction": {
         "enabled": true,
@@ -49,7 +48,7 @@
         "backup_count": 5
     },
     "test": {
-        "enabled": true,
+        "enabled": false,
         "days": 30,
         "hour_interval": 1,
         "device_count": 1

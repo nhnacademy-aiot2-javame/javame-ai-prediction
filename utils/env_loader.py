@@ -89,19 +89,19 @@ def update_config_from_env(config_path="config.json"):
     # 여러 measurement 지원
     # INFLUXDB_MEASUREMENTS 환경 변수가 있으면 사용 (콤마로 구분된 목록)
     measurements_env = os.environ.get("INFLUXDB_MEASUREMENTS", "")
-    if measurements_env:
-        config["influxdb"]["measurements"] = [m.strip() for m in measurements_env.split(",")]
-    # 아니면 기본 measurement 배열 설정
-    elif "measurements" not in config["influxdb"]:
-        # 기존 단일 measurement가 있으면 그것을 배열에 포함
-        if "measurement" in config["influxdb"]:
-            config["influxdb"]["measurements"] = [config["influxdb"]["measurement"]]
-        else:
-            config["influxdb"]["measurements"] = ["system", "cpu", "memory", "disk", "sensors"]
+    # if measurements_env:
+    #     config["influxdb"]["measurements"] = [m.strip() for m in measurements_env.split(",")]
+    # # 아니면 기본 measurement 배열 설정
+    # elif "measurements" not in config["influxdb"]:
+    #     # 기존 단일 measurement가 있으면 그것을 배열에 포함
+    #     if "measurement" in config["influxdb"]:
+    #         config["influxdb"]["measurements"] = [config["influxdb"]["measurement"]]
+    #     else:
+    #         config["influxdb"]["measurements"] = ["system", "cpu", "memory", "disk", "sensors"]
     
-    # 하위 호환성을 위해 첫 번째 measurement를 단일 measurement 필드로 설정
-    if "measurements" in config["influxdb"] and config["influxdb"]["measurements"]:
-        config["influxdb"]["measurement"] = config["influxdb"]["measurements"][0]
+    # # 하위 호환성을 위해 첫 번째 measurement를 단일 measurement 필드로 설정
+    # if "measurements" in config["influxdb"] and config["influxdb"]["measurements"]:
+    #     config["influxdb"]["measurement"] = config["influxdb"]["measurements"][0]
     
     # 2. MySQL 설정
     if "mysql" not in config:
