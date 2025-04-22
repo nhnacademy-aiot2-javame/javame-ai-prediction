@@ -11,7 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Setup AI Prediction service
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_IP }}
+          username: ${{ secrets.SSH_ID }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "ai-prediction/"
+          target: "~"
+          
+      - name: Update docker-compose and deploy
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_IP }}
@@ -19,55 +29,16 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            # 정확한 홈 디렉토리로 이동
-            cd ~
-            
-            # ai-prediction 디렉토리 생성 및 파일 준비
-            mkdir -p ai-prediction
-            cd ai-prediction
-            
-            # Dockerfile 생성
-            echo 'FROM python:3.9-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-# 기본 실행 명령 설정
-CMD ["python", "batch_runner.py"]' > Dockerfile
-            
-            # requirements.txt 생성
-            echo 'tensorflow==2.10.0
-pandas==1.5.3
-numpy==1.24.3
-scikit-learn==1.2.2
-matplotlib==3.7.1
-seaborn==0.12.2
-prophet==1.1.4
-influxdb-client==1.36.1
-mysql-connector-python==8.0.33
-schedule==1.2.0
-python-dotenv==1.0.0
-pytest==7.3.1
-pytest-cov==4.1.0' > requirements.txt
-            
-            # 필요한 파이썬 파일 복사
-            cd ~/aiot2-team3
-            cp -r ai-prediction/* ~/ai-prediction/ || echo "No source files to copy"
-            
-            # docker-compose.yml 파일 업데이트
             cd ~/docker
             
-            # ai-prediction 서비스가 없으면 추가
+            # docker-compose.yml에 ai-prediction 서비스 추가
             if ! grep -q "ai-prediction:" docker-compose.yml; then
-              # 백업 생성
+              echo "Adding ai-prediction service to docker-compose.yml"
               cp docker-compose.yml docker-compose.yml.bak
               
-              # 새 서비스 정의를 임시 파일에 저장
-              echo '  ai-prediction:
+              # 서비스 추가
+              cat >> docker-compose.yml << 'EOF'
+  ai-prediction:
     build: 
       context: ../ai-prediction
       dockerfile: Dockerfile
@@ -84,39 +55,16 @@ pytest-cov==4.1.0' > requirements.txt
       - javame-network
     restart: unless-stopped
     depends_on:
-      - influxdb' > ai-prediction-service.txt
-              
-              # 마지막 서비스 정의 다음에 새 서비스 추가
-              awk '/restart: unless-stopped$/{print;system("cat ai-prediction-service.txt");next}1' docker-compose.yml > docker-compose.yml.new
-              mv docker-compose.yml.new docker-compose.yml
-              rm ai-prediction-service.txt
-              
-              echo "Added ai-prediction service to docker-compose.yml"
+      - influxdb
+EOF
             else
               echo "ai-prediction service already exists in docker-compose.yml"
             fi
-      
-      - name: Deploy AI Prediction service
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_IP }}
-          username: ${{ secrets.SSH_ID }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
-            cd ~/docker
+            
             # 서비스 빌드 및 시작
             docker-compose build ai-prediction
             docker-compose up -d ai-prediction
             
-      - name: Verify deployment
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_IP }}
-          username: ${{ secrets.SSH_ID }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
-            cd ~/docker
+            # 배포 확인
             docker-compose ps | grep ai-prediction || echo "ai-prediction service not running"
-            docker-compose logs --tail=50 ai-prediction || echo "Could not fetch logs"
+            docker-compose logs --tail=20 ai-prediction
