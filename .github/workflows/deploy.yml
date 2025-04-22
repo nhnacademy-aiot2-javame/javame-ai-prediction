@@ -6,55 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-          
-      - name: Check directory structure
-        run: |
-          ls -la
-          # ai-prediction 디렉토리가 있는지 확인
-          if [ -d "ai-prediction" ]; then
-            echo "ai-prediction directory exists"
-          else
-            echo "ai-prediction directory does not exist, checking parent directory"
-            ls -la ..
-          fi
-          
-      - name: Install dependencies
-        run: |
-          # 디렉토리가 존재하면 진행
-          if [ -d "ai-prediction" ]; then
-            cd ai-prediction
-            python -m pip install --upgrade pip
-            pip install pytest
-            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          else
-            echo "Skipping dependency installation as ai-prediction directory doesn't exist"
-          fi
-          
-      - name: Run tests
-        run: |
-          if [ -d "ai-prediction" ] && [ -d "ai-prediction/tests" ]; then
-            cd ai-prediction
-            pytest tests/ -v
-          else
-            echo "No ai-prediction/tests directory found, skipping tests"
-          fi
-
   deploy:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       
-      - name: Deploy to server
+      - name: Setup AI Prediction service
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_IP }}
@@ -62,17 +19,95 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
+            # 정확한 홈 디렉토리로 이동
+            cd ~
+            
+            # ai-prediction 디렉토리 생성 및 파일 준비
+            mkdir -p ai-prediction
+            cd ai-prediction
+            
+            # Dockerfile 생성
+            cat <<EOT > Dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# 기본 실행 명령 설정
+CMD ["python", "batch_runner.py"]
+EOT
+            
+            # requirements.txt 생성
+            cat <<EOT > requirements.txt
+tensorflow==2.10.0
+pandas==1.5.3
+numpy==1.24.3
+scikit-learn==1.2.2
+matplotlib==3.7.1
+seaborn==0.12.2
+prophet==1.1.4
+influxdb-client==1.36.1
+mysql-connector-python==8.0.33
+schedule==1.2.0
+python-dotenv==1.0.0
+pytest==7.3.1
+pytest-cov==4.1.0
+EOT
+            
+            # 필요한 파이썬 파일 복사
             cd ~/aiot2-team3
-            git pull origin main
-            # ai-prediction 디렉토리가 있는지 확인 후 처리
-            if [ -d "ai-prediction" ]; then
-              echo "Deploying AI Prediction service"
-              cd docker
-              # ai-prediction 서비스만 다시 빌드하고 시작
-              docker-compose up -d --build ai-prediction
+            cp -r ai-prediction/* ~/ai-prediction/ || echo "No source files to copy"
+            
+            # docker-compose.yml 파일 업데이트
+            cd ~/docker
+            
+            # ai-prediction 서비스가 없으면 추가
+            if ! grep -q "ai-prediction:" docker-compose.yml; then
+              # 백업 생성
+              cp docker-compose.yml docker-compose.yml.bak
+              
+              # services 블록 끝에 새 서비스 추가
+              sed -i '/restart: unless-stopped$/a\
+  ai-prediction:\
+    build: \
+      context: ../ai-prediction\
+      dockerfile: Dockerfile\
+    container_name: javame-ai-prediction\
+    environment:\
+      - INFLUXDB_URL=http://influxdb:8086\
+      - INFLUXDB_TOKEN=g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==\
+      - INFLUXDB_ORG=javame\
+      - INFLUXDB_BUCKET=aiot\
+      - PREDICTION_INTERVAL=6\
+    volumes:\
+      - ../ai-prediction:/app\
+    networks:\
+      - javame-network\
+    restart: unless-stopped\
+    depends_on:\
+      - influxdb' docker-compose.yml
+              
+              echo "Added ai-prediction service to docker-compose.yml"
             else
-              echo "ai-prediction directory not found, skipping deployment"
+              echo "ai-prediction service already exists in docker-compose.yml"
             fi
+      
+      - name: Deploy AI Prediction service
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_IP }}
+          username: ${{ secrets.SSH_ID }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd ~/docker
+            # 서비스 빌드 및 시작
+            docker-compose build ai-prediction
+            docker-compose up -d ai-prediction
             
       - name: Verify deployment
         uses: appleboy/ssh-action@master
@@ -82,6 +117,6 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            cd ~/aiot2-team3/docker
+            cd ~/docker
             docker-compose ps | grep ai-prediction || echo "ai-prediction service not running"
             docker-compose logs --tail=50 ai-prediction || echo "Could not fetch logs"
