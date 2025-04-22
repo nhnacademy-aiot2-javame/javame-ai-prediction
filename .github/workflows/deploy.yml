@@ -8,8 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    steps:
 
+    steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -25,9 +25,7 @@ jobs:
             mkdir -p ai-prediction
             cd ai-prediction
 
-            # -----------------------------
             # Dockerfile 생성
-            # -----------------------------
             cat << 'EOF' > Dockerfile
 FROM python:3.9-slim
 
@@ -41,9 +39,7 @@ COPY . .
 CMD ["python", "batch_runner.py"]
 EOF
 
-            # -----------------------------
             # requirements.txt 생성
-            # -----------------------------
             cat << 'EOF' > requirements.txt
 tensorflow==2.10.0
 pandas==1.5.3
@@ -60,16 +56,13 @@ pytest==7.3.1
 pytest-cov==4.1.0
 EOF
 
-            # 소스 복사
+            # 파이썬 소스 복사
             cp -r ~/aiot2-team3/ai-prediction/* . || echo "No source files to copy"
 
-            # -----------------------------
             # 공통 docker-compose.yml 업데이트
-            # -----------------------------
             cd ~/docker
             if ! grep -q "ai-prediction:" docker-compose.yml; then
               cp docker-compose.yml docker-compose.yml.bak
-
               cat << 'EOF' > ai-prediction-service.txt
   ai-prediction:
     build:
@@ -90,12 +83,9 @@ EOF
     depends_on:
       - influxdb
 EOF
-
-              awk '/restart: unless-stopped$/{print; system("cat ai-prediction-service.txt"); next}1' docker-compose.yml \
-                > docker-compose.yml.new
+              awk '/restart: unless-stopped$/{print; system("cat ai-prediction-service.txt"); next}1' docker-compose.yml > docker-compose.yml.new
               mv docker-compose.yml.new docker-compose.yml
               rm ai-prediction-service.txt
-
               echo "Added ai-prediction service to docker-compose.yml"
             else
               echo "ai-prediction service already exists in docker-compose.yml"
