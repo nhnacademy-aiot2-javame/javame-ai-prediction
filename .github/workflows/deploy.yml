@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup AI Prediction service
         uses: appleboy/ssh-action@master
         with:
@@ -46,48 +46,15 @@ python-dotenv==1.0.0
 pytest==7.3.1
 pytest-cov==4.1.0' > requirements.txt
 
-FROM python:3.9-slim
+            # 파이썬 소스 복사
+            cp -r ~/aiot2-team3/ai-prediction/* . || echo "No source files to copy"
 
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-CMD ["python", "batch_runner.py"]
-EOF
-
-            # requirements.txt 작성
-            cat <<EOF > requirements.txt
-tensorflow==2.10.0
-pandas==1.5.3
-numpy==1.24.3
-scikit-learn==1.2.2
-matplotlib==3.7.1
-seaborn==0.12.2
-prophet==1.1.4
-influxdb-client==1.36.1
-mysql-connector-python==8.0.33
-schedule==1.2.0
-python-dotenv==1.0.0
-pytest==7.3.1
-pytest-cov==4.1.0
-EOF
-
-            # 필요한 파이썬 파일 복사
-            cd ~/aiot2-team3
-            cp -r ai-prediction/* ~/ai-prediction/ || echo "No source files to copy"
-
-            # docker-compose.yml 파일 업데이트
+            # 공통 docker-compose.yml에 서비스 추가
             cd ~/docker
-
             if ! grep -q "ai-prediction:" docker-compose.yml; then
               cp docker-compose.yml docker-compose.yml.bak
-
-              cat <<EOF > ai-prediction-service.txt
-  ai-prediction:
-    build: 
+              echo '  ai-prediction:
+    build:
       context: ../ai-prediction
       dockerfile: Dockerfile
     container_name: javame-ai-prediction
@@ -103,10 +70,8 @@ EOF
       - javame-network
     restart: unless-stopped
     depends_on:
-      - influxdb
-EOF
-
-              awk '/restart: unless-stopped$/{print;system("cat ai-prediction-service.txt");next}1' docker-compose.yml > docker-compose.yml.new
+      - influxdb' > ai-prediction-service.txt
+              awk '/restart: unless-stopped$/{print; system("cat ai-prediction-service.txt"); next}1' docker-compose.yml > docker-compose.yml.new
               mv docker-compose.yml.new docker-compose.yml
               rm ai-prediction-service.txt
               echo "Added ai-prediction service to docker-compose.yml"
