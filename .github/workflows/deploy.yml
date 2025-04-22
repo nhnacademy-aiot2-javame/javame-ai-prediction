@@ -1,10 +1,8 @@
 name: AI Prediction Deployment
-
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -36,9 +34,8 @@ jobs:
               echo "Adding ai-prediction service to docker-compose.yml"
               cp docker-compose.yml docker-compose.yml.bak
               
-              # 서비스 추가
-              cat >> docker-compose.yml << 'EOF'
-  ai-prediction:
+              # 단일 파일로 저장
+              echo "  ai-prediction:
     build: 
       context: ../ai-prediction
       dockerfile: Dockerfile
@@ -55,8 +52,12 @@ jobs:
       - javame-network
     restart: unless-stopped
     depends_on:
-      - influxdb
-EOF
+      - influxdb" > ai-prediction-service.txt
+              
+              # volumes: 라인 앞에 삽입
+              sed -i '/^volumes:/i\\' docker-compose.yml
+              sed -i '/^volumes:/e cat ai-prediction-service.txt' docker-compose.yml
+              rm ai-prediction-service.txt
             else
               echo "ai-prediction service already exists in docker-compose.yml"
             fi
