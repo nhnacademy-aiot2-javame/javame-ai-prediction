@@ -7,18 +7,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Copy files to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_IP }}
-          username: ${{ secrets.SSH_ID }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          source: "ai-prediction/"
-          target: "~"
-          
       - name: Deploy AI prediction service
         uses: appleboy/ssh-action@master
         with:
@@ -28,33 +16,11 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           script: |
             cd ~/docker
-            echo 'version: "3.8"' > docker-compose-ai.yml
-            echo 'services:' >> docker-compose-ai.yml
-            echo '  ai-prediction:' >> docker-compose-ai.yml
-            echo '    build:' >> docker-compose-ai.yml 
-            echo '      context: ../ai-prediction' >> docker-compose-ai.yml
-            echo '      dockerfile: Dockerfile' >> docker-compose-ai.yml
-            echo '    container_name: javame-ai-prediction' >> docker-compose-ai.yml
-            echo '    environment:' >> docker-compose-ai.yml
-            echo '      - INFLUXDB_URL=http://influxdb:8086' >> docker-compose-ai.yml
-            echo '      - INFLUXDB_TOKEN=g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==' >> docker-compose-ai.yml
-            echo '      - INFLUXDB_ORG=javame' >> docker-compose-ai.yml
-            echo '      - INFLUXDB_BUCKET=aiot' >> docker-compose-ai.yml
-            echo '      - PREDICTION_INTERVAL=6' >> docker-compose-ai.yml
-            echo '    volumes:' >> docker-compose-ai.yml
-            echo '      - ../ai-prediction:/app' >> docker-compose-ai.yml
-            echo '    networks:' >> docker-compose-ai.yml
-            echo '      - javame-network' >> docker-compose-ai.yml
-            echo '    restart: unless-stopped' >> docker-compose-ai.yml
-            echo '    depends_on:' >> docker-compose-ai.yml
-            echo '      - influxdb' >> docker-compose-ai.yml
-            echo 'networks:' >> docker-compose-ai.yml
-            echo '  javame-network:' >> docker-compose-ai.yml
-            echo '    external: true' >> docker-compose-ai.yml
             
-            # 서비스 빌드 및 시작
-            docker-compose -f docker-compose-ai.yml build
-            docker-compose -f docker-compose-ai.yml up -d
+            # 서비스 빌드 및 재시작
+            docker-compose build ai-prediction
+            docker-compose up -d ai-prediction
             
             # 배포 확인
-            docker-compose -f docker-compose-ai.yml ps
+            docker-compose ps ai-prediction
+            docker-compose logs --tail=50 ai-prediction
