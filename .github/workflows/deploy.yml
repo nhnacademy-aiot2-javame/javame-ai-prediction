@@ -24,7 +24,28 @@ jobs:
             cd ai-prediction
 
             # Dockerfile 작성
-            cat <<EOF > Dockerfile
+            echo 'FROM python:3.9-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "batch_runner.py"]' > Dockerfile
+
+            # requirements.txt 작성
+            echo 'tensorflow==2.10.0
+pandas==1.5.3
+numpy==1.24.3
+scikit-learn==1.2.2
+matplotlib==3.7.1
+seaborn==0.12.2
+prophet==1.1.4
+influxdb-client==1.36.1
+mysql-connector-python==8.0.33
+schedule==1.2.0
+python-dotenv==1.0.0
+pytest==7.3.1
+pytest-cov==4.1.0' > requirements.txt
+
 FROM python:3.9-slim
 
 WORKDIR /app
