@@ -8,8 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -20,15 +20,15 @@ jobs:
           username: ${{ secrets.SSH_ID }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-        script: |
-          cd ~
-          mkdir -p ai-prediction
-          cd ai-prediction
+          script: |
+            cd ~
+            mkdir -p ai-prediction
+            cd ai-prediction
 
-          # -----------------------------
-          # Dockerfile 생성
-          # -----------------------------
-          cat << 'EOF' > Dockerfile
+            # -----------------------------
+            # Dockerfile 생성
+            # -----------------------------
+            cat << 'EOF' > Dockerfile
 FROM python:3.9-slim
 
 WORKDIR /app
@@ -41,10 +41,10 @@ COPY . .
 CMD ["python", "batch_runner.py"]
 EOF
 
-          # -----------------------------
-          # requirements.txt 생성
-          # -----------------------------
-          cat << 'EOF' > requirements.txt
+            # -----------------------------
+            # requirements.txt 생성
+            # -----------------------------
+            cat << 'EOF' > requirements.txt
 tensorflow==2.10.0
 pandas==1.5.3
 numpy==1.24.3
@@ -60,17 +60,17 @@ pytest==7.3.1
 pytest-cov==4.1.0
 EOF
 
-          # 소스 복사
-          cp -r ~/aiot2-team3/ai-prediction/* . || echo "No source files to copy"
+            # 소스 복사
+            cp -r ~/aiot2-team3/ai-prediction/* . || echo "No source files to copy"
 
-          # -----------------------------
-          # 공통 docker-compose.yml 업데이트
-          # -----------------------------
-          cd ~/docker
-          if ! grep -q "ai-prediction:" docker-compose.yml; then
-            cp docker-compose.yml docker-compose.yml.bak
+            # -----------------------------
+            # 공통 docker-compose.yml 업데이트
+            # -----------------------------
+            cd ~/docker
+            if ! grep -q "ai-prediction:" docker-compose.yml; then
+              cp docker-compose.yml docker-compose.yml.bak
 
-            cat << 'EOF' > ai-prediction-service.txt
+              cat << 'EOF' > ai-prediction-service.txt
   ai-prediction:
     build:
       context: ../ai-prediction
@@ -91,15 +91,15 @@ EOF
       - influxdb
 EOF
 
-            awk '/restart: unless-stopped$/{print; system("cat ai-prediction-service.txt"); next}1' docker-compose.yml \
-              > docker-compose.yml.new
-            mv docker-compose.yml.new docker-compose.yml
-            rm ai-prediction-service.txt
+              awk '/restart: unless-stopped$/{print; system("cat ai-prediction-service.txt"); next}1' docker-compose.yml \
+                > docker-compose.yml.new
+              mv docker-compose.yml.new docker-compose.yml
+              rm ai-prediction-service.txt
 
-            echo "Added ai-prediction service to docker-compose.yml"
-          else
-            echo "ai-prediction service already exists in docker-compose.yml"
-          fi
+              echo "Added ai-prediction service to docker-compose.yml"
+            else
+              echo "ai-prediction service already exists in docker-compose.yml"
+            fi
 
       - name: Deploy AI Prediction service
         uses: appleboy/ssh-action@master
@@ -108,10 +108,10 @@ EOF
           username: ${{ secrets.SSH_ID }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-        script: |
-          cd ~/docker
-          docker-compose build ai-prediction
-          docker-compose up -d ai-prediction
+          script: |
+            cd ~/docker
+            docker-compose build ai-prediction
+            docker-compose up -d ai-prediction
 
       - name: Verify deployment
         uses: appleboy/ssh-action@master
@@ -120,7 +120,7 @@ EOF
           username: ${{ secrets.SSH_ID }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-        script: |
-          cd ~/docker
-          docker-compose ps | grep ai-prediction || echo "ai-prediction service not running"
-          docker-compose logs --tail=50 ai-prediction || echo "Could not fetch logs"
+          script: |
+            cd ~/docker
+            docker-compose ps | grep ai-prediction || echo "ai-prediction service not running"
+            docker-compose logs --tail=50 ai-prediction || echo "Could not fetch logs"
