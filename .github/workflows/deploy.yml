@@ -15,8 +15,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            cd ~/ai-prediction  # 올바른 경로
+            cd ~/ai-prediction
             git pull origin main
             cd ~/docker
-            docker-compose build ai-prediction
+            docker-compose stop ai-prediction
+            docker-compose rm -f ai-prediction
             docker-compose up -d ai-prediction
