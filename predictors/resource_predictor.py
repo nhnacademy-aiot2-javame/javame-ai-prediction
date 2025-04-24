@@ -22,6 +22,7 @@ from models.lstm_model import ResourceLSTM
 from utils.visualization import plot_sensor_data, plot_resource_prediction, plot_correlation_matrix, plot_long_term_scenarios
 from utils.data_loader import preprocess_data, adjust_config_for_data_size
 from utils.db_utils import save_to_mysql
+from utils.api_sender import APISender, get_api_url
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
