@@ -231,37 +231,31 @@ def load_all_data():
         logger.error(f"최종 데이터 병합 중 오류: {e}")
         return pd.DataFrame()
 
-def query_influxdb(config, start_time, measurements=None):
+def query_influxdb(config, start_time, origins=None):
     """
-    InfluxDB에서 데이터 쿼리 (여러 measurement 지원)
+    InfluxDB에서 데이터 쿼리 (origin 태그 기반)
     
     Args:
         config (dict): InfluxDB 설정
         start_time (datetime): 쿼리 시작 시간
-        measurements (list): 쿼리할 측정명 목록 (None이면 설정의 measurements 사용)
+        origins (list): 쿼리할 origin 목록 (None이면 모든 origin)
         
     Returns:
         pd.DataFrame: 쿼리 결과
     """
     influx_config = config["influxdb"]
     
-    # 여러 measurement 처리
-    if measurements is None:
-        if "measurements" in influx_config:
-            measurements = influx_config["measurements"]
-        elif "measurement" in influx_config:
-            # 하위 호환성 유지
-            measurements = [influx_config["measurement"]]
-        else:
-            measurements = ["system"]  # 기본값
-    elif isinstance(measurements, str):
-        measurements = [measurements]
+    # origin 목록 처리
+    if origins is None:
+        origins = ["server_data", "sensor_data"]  # 기본값
+    elif isinstance(origins, str):
+        origins = [origins]
     
     try:
-        # 로그에 설정 정보 출력 (비밀번호는 마스킹)
+        # 로그에 설정 정보 출력
         masked_token = influx_config["token"][:4] + "..." if len(influx_config["token"]) > 4 else "***"
         logger.info(f"InfluxDB 연결 시도: URL={influx_config['url']}, Org={influx_config['org']}, Bucket={influx_config['bucket']}, Token={masked_token}")
-        logger.info(f"쿼리 대상 measurements: {measurements}")
+        logger.info(f"쿼리 대상 origins: {origins}")
         
         client = InfluxDBClient(
             url=influx_config["url"],
@@ -274,116 +268,65 @@ def query_influxdb(config, start_time, measurements=None):
         # 시작 시간 문자열 형식으로 변환
         start_time_str = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
         
-        # 모든 측정명에 대한 쿼리 결과를 담을 DataFrame
+        # 모든 origin에 대한 쿼리 결과를 담을 DataFrame
         all_data = pd.DataFrame()
         
-        # 각 측정명마다 개별 쿼리 실행 (타입 충돌 방지)
-        for measurement in measurements:
-            logger.info(f"'{measurement}' 측정 쿼리 실행")
+        # 각 origin마다 개별 쿼리 실행
+        for origin in origins:
+            logger.info(f"'{origin}' origin 쿼리 실행")
             
-            # 먼저 필드 목록 가져오기
-            field_query = f'''
+            # pivot 쿼리 사용하여 필드를 컬럼으로 변환
+            query = f'''
             from(bucket: "{influx_config["bucket"]}")
               |> range(start: {start_time_str})
-              |> filter(fn: (r) => r._measurement == "{measurement}")
-              |> group()
-              |> distinct(column: "_field")
+              |> filter(fn: (r) => r["origin"] == "{origin}")
+              |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
             '''
             
             try:
-                field_tables = query_api.query(query=field_query)
-                fields = []
+                # 데이터프레임으로 직접 쿼리
+                result = query_api.query_data_frame(query)
                 
-                for table in field_tables:
-                    for record in table.records:
-                        field_name = record.values["_field"]
-                        # 문자열 필드는 제외 (uptime_format 등)
-                        if field_name != "uptime_format":
-                            fields.append(field_name)
+                if isinstance(result, list):
+                    # 여러 테이블이 반환된 경우 병합
+                    result = pd.concat(result)
                 
-                if not fields:
-                    logger.warning(f"'{measurement}' 측정에서 사용 가능한 필드가 없습니다.")
+                if result.empty:
+                    logger.warning(f"'{origin}' origin에서 데이터가 없습니다.")
                     continue
                 
-                logger.info(f"'{measurement}' 필드 목록: {fields}")
+                # _time을 인덱스로 설정
+                if '_time' in result.columns:
+                    result.set_index('_time', inplace=True)
                 
-                # 각 필드별로 개별 쿼리 실행
-                measurement_df = pd.DataFrame()
+                # 불필요한 메타데이터 컬럼 제거
+                exclude_cols = ['result', 'table', '_start', '_stop', '_measurement']
+                data_cols = [col for col in result.columns if col not in exclude_cols]
                 
-                for field in fields:
-                    try:
-                        # 필드별 쿼리
-                        field_query = f'''
-                        from(bucket: "{influx_config["bucket"]}")
-                          |> range(start: {start_time_str})
-                          |> filter(fn: (r) => r._measurement == "{measurement}" and r._field == "{field}")
-                          |> aggregateWindow(every: 1h, fn: mean, createEmpty: true)
-                        '''
-                        
-                        tables = query_api.query(query=field_query)
-                        
-                        # 결과를 데이터프레임으로 변환
-                        df = pd.DataFrame()
-                        
-                        for table in tables:
-                            for record in table.records:
-                                record_df = pd.DataFrame([{
-                                    'timestamp': record.get_time(),
-                                    'field': field,
-                                    'value': record.get_value(),
-                                    'measurement': measurement,
-                                    'device_id': record.values.get('device_id', 'unknown')
-                                }])
-                                df = pd.concat([df, record_df])
-                        
-                        if not df.empty:
-                            # 값 타입 강제 변환 (object → float), 변환 불가 시 NaN
-                            df['value'] = pd.to_numeric(df['value'], errors='coerce')
-                            df.dropna(subset=['value'], inplace=True)
-                            
-                            # 타임스탬프를 인덱스로 설정
-                            df['timestamp'] = pd.to_datetime(df['timestamp'])
-                            
-                            # 필드별 피벗
-                            df_pivot = df.pivot_table(
-                                index='timestamp',
-                                columns='field',
-                                values='value',
-                                aggfunc='first'
-                            )
-                            
-                            # 측정 항목 결과에 추가
-                            if measurement_df.empty:
-                                measurement_df = df_pivot
-                            else:
-                                measurement_df = measurement_df.join(df_pivot, how='outer')
-                            
-                            logger.info(f"'{measurement}.{field}' 쿼리 성공: {len(df_pivot)}개 행")
-                    except Exception as e:
-                        logger.warning(f"'{measurement}.{field}' 쿼리 중 오류: {e}")
-                
-                # 측정 항목별 결과가 있으면 컬럼명 측정 항목 정보 포함하여 변환
-                if not measurement_df.empty:
-                    # 컬럼명 변환 (field → measurement_field)
-                    measurement_df.columns = [f"{measurement}_{col}" for col in measurement_df.columns]
-                    
-                    # 전체 결과에 추가
-                    if all_data.empty:
-                        all_data = measurement_df
-                    else:
-                        all_data = all_data.join(measurement_df, how='outer')
-                    
-                    logger.info(f"'{measurement}' 측정 쿼리 결과: {len(measurement_df)}개 행, {measurement_df.shape[1]}개 열")
+                # origin 식별을 위한 접두어 추가
+                result = result[data_cols]
+                if origin == "server_data":
+                    # 서버 데이터는 원래 이름 유지
+                    origin_df = result
                 else:
-                    logger.warning(f"'{measurement}' 측정 쿼리 결과가 없습니다.")
+                    # 센서 데이터는 접두어 추가
+                    origin_df = result.add_prefix(f"{origin}_")
+                
+                # 전체 결과에 추가
+                if all_data.empty:
+                    all_data = origin_df
+                else:
+                    all_data = all_data.join(origin_df, how='outer')
+                
+                logger.info(f"'{origin}' origin 쿼리 결과: {len(origin_df)}개 행, {origin_df.shape[1]}개 열")
             
             except Exception as e:
-                logger.error(f"'{measurement}' 필드 목록 쿼리 중 오류: {e}")
+                logger.error(f"'{origin}' origin 쿼리 중 오류: {e}")
                 continue
                 
         # 결과가 비어있는지 확인
         if all_data.empty:
-            logger.warning(f"모든 측정에 대한 쿼리 결과가 비어있습니다.")
+            logger.warning(f"모든 origin에 대한 쿼리 결과가 비어있습니다.")
             return pd.DataFrame()
         
         # 결측치 처리

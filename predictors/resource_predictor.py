@@ -33,16 +33,7 @@ def ensure_dir(directory):
         logger.info(f"디렉토리 생성: {directory}")
 
 def run_resource_analysis(config, df=None):
-    """
-    자원 사용량 분석 실행
-    
-    Args:
-        config (dict): 설정 정보
-        df (pd.DataFrame): 데이터프레임 (None이면 파일에서 로드)
-        
-    Returns:
-        tuple: (성공 여부, 결과 데이터프레임)
-    """
+    """자원 사용량 분석 실행"""
     logger.info("======= 자원 사용량 분석 실행 =======")
     
     resource_config = config["resource_analysis"]
@@ -52,6 +43,99 @@ def run_resource_analysis(config, df=None):
     # 데이터 확인
     if df is None or df.empty:
         logger.warning("데이터가 없습니다. 자원 사용량 분석을 건너뜁니다.")
+        return False, None
+    
+    # 타겟 컬럼 후보 목록 (새 데이터 구조 반영)
+    target_candidates = [
+        'usage_user',           # CPU 사용률
+        'available_percent',    # 메모리 가용률
+        'memory_usage',         # 메모리 사용률 (계산된 특성)
+        'load1'                 # 시스템 로드
+    ]
+    
+    # 타겟 컬럼 선택
+    target_column = resource_config["target_column"]
+    if target_column not in df.columns:
+        logger.error(f"타겟 컬럼 '{target_column}'이 데이터에 없습니다.")
+        
+        # 대체 타겟 찾기
+        for candidate in target_candidates:
+            if candidate in df.columns:
+                target_column = candidate
+                logger.info(f"타겟 컬럼을 '{target_column}'으로 변경합니다.")
+                resource_config["target_column"] = target_column
+                break
+        else:
+            logger.error("적절한 타겟 컬럼을 찾을 수 없습니다.")
+            return False, None
+    
+    # 데이터 전처리
+    df = preprocess_data(df, target_column)
+    
+    # 고급 특성 생성
+    df = _create_advanced_features(df)
+    
+    # 입력 윈도우 및 예측 지평선 설정
+    input_window = min(resource_config["input_window"], len(df) // 2)
+    pred_horizon = 24  # 24시간 예측
+    
+    # 모델 생성
+    input_dim = df.shape[1]
+    model = ResourceLSTM(
+        input_dim=input_dim,
+        input_window=input_window,
+        pred_horizon=pred_horizon,
+        model_save_path=os.path.join(model_dir, 'resource_lstm.h5')
+    )
+    
+    # 모델 학습
+    logger.info(f"{target_column} 예측 모델 학습 중...")
+    history = model.fit(
+        df, 
+        target_col=target_column,
+        epochs=50,
+        batch_size=16
+    )
+    
+    # 예측 수행
+    logger.info(f"{target_column} 예측 수행 중...")
+    results = model.predict(df, target_column)
+    
+    # 결과 저장
+    if not results.empty:
+        # 결과에 메타데이터 추가
+        results_df = results.reset_index()
+        results_df.rename(columns={'index': 'timestamp'}, inplace=True)
+        results_df['device_id'] = "server_001"  # 적절한 서버 ID로 변경
+        results_df['resource_type'] = target_column
+        results_df['prediction_time'] = datetime.now()
+        
+        # MySQL 저장
+        if 'mysql' in config:
+            save_to_mysql(results_df, "resource_predictions", config)
+        
+        # 장기 예측 수행
+        logger.info("장기 자원 사용량 예측 수행 중...")
+        scenario_results, expansion_dates = model.predict_long_term(
+            periods=90,  # 3개월
+            capacity_threshold=resource_config["capacity_threshold"]
+        )
+        
+        # 예측 결과 시각화 및 저장
+        _save_prediction_results(
+            config, df, target_column, results, 
+            scenario_results, expansion_dates, 
+            datetime.now(), model
+        )
+        
+        logger.info(f"{target_column} 예측 완료")
+        return True, {
+            'short_term': results,
+            'long_term': scenario_results,
+            'expansion_dates': expansion_dates
+        }
+    else:
+        logger.warning("예측 결과가 비어 있습니다.")
         return False, None
 
 def _create_advanced_features(df):

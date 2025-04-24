@@ -401,3 +401,60 @@ def plot_feature_importance(df, target_col, n_features=10, save_path=None, figsi
             
     except Exception as e:
         logger.error(f"특성 중요도 분석 중 오류 발생: {e}")
+def plot_server_environment_correlation(df, server_cols, env_cols, save_path=None, figsize=(15, 10)):
+    """
+    서버 성능과 환경 데이터 간의 상관관계 시각화
+    
+    Args:
+        df (pd.DataFrame): 데이터프레임
+        server_cols (list): 서버 성능 관련 열 이름 목록
+        env_cols (list): 환경 관련 열 이름 목록
+        save_path (str): 저장 경로 (None이면 표시만 함)
+        figsize (tuple): 그림 크기
+    """
+    plt.figure(figsize=figsize)
+    
+    # 열 존재 여부 확인
+    server_cols = [col for col in server_cols if col in df.columns]
+    env_cols = [col for col in env_cols if col in df.columns]
+    
+    if not server_cols or not env_cols:
+        logger.warning("서버 또는 환경 데이터 열이 없습니다.")
+        return
+    
+    # 상관관계 분석 및 시각화
+    plt.subplot(2, 1, 1)
+    # 시간에 따른 추이 시각화
+    for col in server_cols:
+        # 정규화하여 같은 스케일로 표시
+        normalized = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+        plt.plot(df.index, normalized, label=f'{col} (정규화)')
+    
+    for col in env_cols:
+        # 정규화하여 같은 스케일로 표시
+        normalized = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+        plt.plot(df.index, normalized, label=f'{col} (정규화)', linestyle='--')
+    
+    plt.title('서버 성능과 환경 데이터 시계열 비교')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    # 산점도 매트릭스
+    plt.subplot(2, 1, 2)
+    corr_cols = server_cols + env_cols
+    corr_matrix = df[corr_cols].corr()
+    
+    # 히트맵으로 상관관계 표시
+    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+    plt.title('서버-환경 변수 간 상관관계')
+    
+    plt.tight_layout()
+    
+    # 결과 저장 또는 표시
+    if save_path:
+        ensure_dir(os.path.dirname(save_path))
+        plt.savefig(save_path, dpi=300)
+        plt.close()
+        logger.info(f"서버-환경 상관관계 시각화 저장: {save_path}")
+    else:
+        plt.show()

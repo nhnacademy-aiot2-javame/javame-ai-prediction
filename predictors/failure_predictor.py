@@ -34,16 +34,7 @@ def ensure_dir(directory):
         logger.info(f"디렉토리 생성: {directory}")
 
 def run_failure_prediction(config, df=None):
-    """
-    고장 예측 실행
-    
-    Args:
-        config (dict): 설정 정보
-        df (pd.DataFrame): 데이터프레임 (None이면 파일에서 로드)
-        
-    Returns:
-        tuple: (성공 여부, 결과 데이터프레임)
-    """
+    """고장 예측 실행"""
     logger.info("======= 고장 예측 실행 =======")
     
     failure_config = config["failure_prediction"]
@@ -55,58 +46,38 @@ def run_failure_prediction(config, df=None):
         logger.warning("데이터가 없습니다. 고장 예측을 건너뜁니다.")
         return False, None
     
-    # 타겟 컬럼이 데이터에 있는지 확인 및 대체
+    # 온도 기반 고장 예측을 위한 타겟 후보
+    target_candidates = [
+        'sensor_data_temperature',  # 외부 센서 온도
+        'temp_input',               # 서버 내부 온도
+        'high_temp_high_cpu',       # 고온-고부하 복합 특성
+        'high_temp_low_mem'         # 고온-메모리부족 복합 특성
+    ]
+    
+    # 타겟 컬럼 선택
     target_column = failure_config["target_column"]
     if target_column not in df.columns:
         logger.error(f"타겟 컬럼 '{target_column}'이 데이터에 없습니다.")
-        logger.info(f"사용 가능한 컬럼: {df.columns.tolist()}")
         
-        # 대체 컬럼 찾기
-        target_candidates = [
-            'temp_input',       # 온도
-            'usage_user', 'user',  # CPU 사용자 사용률
-            'usage_system', 'system',  # CPU 시스템 사용률
-            'usage_iowait', 'iowait',  # CPU I/O 대기
-            'used_percent'      # 사용률(메모리, 디스크)
-        ]
-        
+        # 대체 타겟 찾기
         for candidate in target_candidates:
             if candidate in df.columns:
-                logger.info(f"'{candidate}' 컬럼을 타겟으로 사용합니다.")
-                failure_config["target_column"] = candidate
+                target_column = candidate
+                logger.info(f"타겟 컬럼을 '{target_column}'으로 변경합니다.")
+                failure_config["target_column"] = target_column
                 break
         else:
             logger.error("적절한 타겟 컬럼을 찾을 수 없습니다.")
             return False, None
     
-    # 업데이트된 타겟 컬럼 사용
-    target_column = failure_config["target_column"]
-    
     # 데이터 전처리
     df = preprocess_data(df, target_column)
     
-    # NaN 값 확인 및 처리
-    if df.isna().any().any():
-        logger.warning("데이터에 NaN 값이 있습니다. 보간합니다.")
-        df = df.interpolate(method='linear')
-        df = df.bfill()
-        df = df.ffill()
-    
-    # 설정이 데이터 크기에 적합한지 확인 및 조정
-    config = adjust_config_for_data_size(config, df)
-    failure_config = config["failure_prediction"]
-    
-    # 충분한 데이터가 있는지 확인
-    min_required_samples = 2  # 최소한의 학습 가능 데이터 수
-    if len(df) < min_required_samples:
-        logger.error(f"데이터가 너무 적습니다: {len(df)}행. 최소 {min_required_samples}행 필요합니다.")
-        return False, None
-    
-    # 데이터 크기에 맞게 input_window 조정
-    input_window = min(failure_config["input_window"], len(df) - 1)
-    
-    # 고급 특성 생성 (추가된 부분)
+    # 고급 특성 생성
     df = _create_advanced_features(df)
+    
+    # 입력 윈도우 설정
+    input_window = min(failure_config["input_window"], len(df) // 2)
     
     # 모델 생성
     input_dim = df.shape[1]
@@ -117,285 +88,146 @@ def run_failure_prediction(config, df=None):
         model_save_path=os.path.join(model_dir, 'failure_lstm.h5')
     )
     
+    # 임계값 설정 (온도 기반)
+    if 'temperature' in target_column:
+        # 온도는 높을수록 위험
+        values = df[target_column].values
+        threshold = np.percentile(values, 90)  # 상위 10% 온도를 위험으로 간주
+    else:
+        # 기본 임계값 사용
+        threshold = failure_config["threshold"]
+    
     # 모델 학습
-    logger.info("고장 예측 모델 학습 중...")
-    
-    # 임계값 조정 (데이터에 맞게)
-    target_values = df[target_column].values
-    mean_value = target_values.mean()
-    std_value = target_values.std()
-    threshold = mean_value + 1.5 * std_value  # 평균 + 1.5 * 표준편차
-    
+    logger.info(f"고장 예측 모델 학습 중 (타겟: {target_column}, 임계값: {threshold})...")
     history = model.fit(
         df, 
         target_col=target_column,
         failure_threshold=threshold,
         epochs=50,
-        batch_size=16  # 작은 데이터셋에 맞게 배치 크기 조정
+        batch_size=16
     )
-    
-    # 학습이 실패한 경우
-    if history is None:
-        logger.error("모델 학습에 실패했습니다. 데이터가 충분하지 않습니다.")
-        return False, None
-    
-    # 데이터가 충분하지 않으면 예측 단계 건너뛰기
-    if len(df) <= input_window:
-        logger.warning(f"예측을 위한 데이터가 부족합니다. 최소 {input_window+1}행 필요, 현재 {len(df)}행")
-        return False, None
     
     # 예측 수행
     logger.info("고장 예측 수행 중...")
-    try:
-        results = model.predict(df)
+    results = model.predict(df)
+    
+    # 결과 저장
+    if not results.empty:
+        # 디바이스 ID 및 예측 시간 추가
+        results['device_id'] = "server_001"  # 적절한 서버 ID로 변경
+        results['prediction_time'] = datetime.now()
         
-        # 결과가 비어있는지 확인
-        if results.empty:
-            logger.warning("예측 결과가 비어 있습니다.")
-            return False, None
-        
-        # 디바이스 ID 추가
-        device_id = "device_001"  # 기본값
-        results['device_id'] = device_id
-        
-        # 예측 시간 추가
-        prediction_time = datetime.now()
-        results['prediction_time'] = prediction_time
-        
-        # 결과 저장 (MySQL)
+        # MySQL 저장
         if 'mysql' in config:
-            try:
-                save_to_mysql(results, "failure_predictions", config)
-            except Exception as e:
-                logger.error(f"MySQL 저장 중 오류: {e}")
-                # MySQL 오류가 발생해도 계속 진행
+            save_to_mysql(results, "failure_predictions", config)
         
         # 결과 시각화 및 저장
-        _save_prediction_results(config, df, target_column, results, prediction_time, model)
+        _save_failure_prediction_results(
+            config, df, target_column, results, 
+            datetime.now(), model
+        )
         
-        logger.info(f"고장 예측 완료: 총 {len(results)}개 결과, 예측된 고장: {results['is_failure_predicted'].sum()}개")
+        # 고장 예측 횟수 계산
+        failure_count = results['is_failure_predicted'].sum()
+        logger.info(f"고장 예측 완료: {len(results)}개 데이터 포인트 중 {failure_count}개 고장 예측")
+        
         return True, results
-    
-    except Exception as e:
-        logger.error(f"예측 수행 중 오류 발생: {e}")
+    else:
+        logger.warning("예측 결과가 비어 있습니다.")
         return False, None
-def run_failure_prediction(config, df=None):
-    """
-    고장 예측 실행
-    
-    Args:
-        config (dict): 설정 정보
-        df (pd.DataFrame): 데이터프레임 (None이면 파일에서 로드)
-        
-    Returns:
-        tuple: (성공 여부, 결과 데이터프레임)
-    """
-    logger.info("======= 고장 예측 실행 =======")
-    
-    failure_config = config["failure_prediction"]
-    model_dir = config["results"].get("model_dir", "model_weights")
-    ensure_dir(model_dir)
-    
-    # 데이터 확인
-    if df is None or df.empty:
-        logger.warning("데이터가 없습니다. 고장 예측을 건너뜁니다.")
-        return False, None
-    
-    # 타겟 컬럼이 데이터에 있는지 확인 및 대체
-    target_column = failure_config["target_column"]
-    if target_column not in df.columns:
-        logger.error(f"타겟 컬럼 '{target_column}'이 데이터에 없습니다.")
-        logger.info(f"사용 가능한 컬럼: {df.columns.tolist()}")
-        
-        # 대체 컬럼 찾기
-        target_candidates = [
-            'temp_input',       # 온도
-            'usage_user', 'user',  # CPU 사용자 사용률
-            'usage_system', 'system',  # CPU 시스템 사용률
-            'usage_iowait', 'iowait',  # CPU I/O 대기
-            'used_percent'      # 사용률(메모리, 디스크)
-        ]
-        
-        for candidate in target_candidates:
-            if candidate in df.columns:
-                logger.info(f"'{candidate}' 컬럼을 타겟으로 사용합니다.")
-                failure_config["target_column"] = candidate
-                break
-        else:
-            logger.error("적절한 타겟 컬럼을 찾을 수 없습니다.")
-            return False, None
-    
-    # 업데이트된 타겟 컬럼 사용
-    target_column = failure_config["target_column"]
-    
-    # 데이터 전처리
-    df = preprocess_data(df, target_column)
-    
-    # NaN 값 확인 및 처리
-    if df.isna().any().any():
-        logger.warning("데이터에 NaN 값이 있습니다. 보간합니다.")
-        df = df.interpolate(method='linear')
-        df = df.bfill()
-        df = df.ffill()
-    
-    # 설정이 데이터 크기에 적합한지 확인 및 조정
-    config = adjust_config_for_data_size(config, df)
-    failure_config = config["failure_prediction"]
-    
-    # 충분한 데이터가 있는지 확인
-    min_required_samples = 2  # 최소한의 학습 가능 데이터 수
-    if len(df) < min_required_samples:
-        logger.error(f"데이터가 너무 적습니다: {len(df)}행. 최소 {min_required_samples}행 필요합니다.")
-        return False, None
-    
-    # 고급 특성 생성 (추가된 부분)
-    df = _create_advanced_features(df)
-    
-    # 데이터 크기에 맞게 input_window 조정
-    input_window = min(failure_config["input_window"], len(df) - 1)
-    
-    # 모델 생성
-    input_dim = df.shape[1]
-    model = FailureLSTM(
-        input_dim=input_dim,
-        input_window=input_window,
-        pred_horizon=1,
-        model_save_path=os.path.join(model_dir, 'failure_lstm.h5')
-    )
-    
-    # 모델 학습
-    logger.info("고장 예측 모델 학습 중...")
-    
-    # 임계값 조정 (데이터에 맞게)
-    target_values = df[target_column].values
-    mean_value = target_values.mean()
-    std_value = target_values.std()
-    threshold = mean_value + 1.5 * std_value  # 평균 + 1.5 * 표준편차
-    
-    history = model.fit(
-        df, 
-        target_col=target_column,
-        failure_threshold=threshold,
-        epochs=50,
-        batch_size=16  # 작은 데이터셋에 맞게 배치 크기 조정
-    )
-    
-    # 학습이 실패한 경우
-    if history is None:
-        logger.error("모델 학습에 실패했습니다. 데이터가 충분하지 않습니다.")
-        return False, None
-    
-    # 데이터가 충분하지 않으면 예측 단계 건너뛰기
-    if len(df) <= input_window:
-        logger.warning(f"예측을 위한 데이터가 부족합니다. 최소 {input_window+1}행 필요, 현재 {len(df)}행")
-        return False, None
-    
-    # 예측 수행
-    logger.info("고장 예측 수행 중...")
-    try:
-        results = model.predict(df)
-        
-        # 결과가 비어있는지 확인
-        if results.empty:
-            logger.warning("예측 결과가 비어 있습니다.")
-            return False, None
-        
-        # 디바이스 ID 추가
-        device_id = "device_001"  # 기본값
-        results['device_id'] = device_id
-        
-        # 예측 시간 추가
-        prediction_time = datetime.now()
-        results['prediction_time'] = prediction_time
-        
-        # 결과 저장 (MySQL)
-        if 'mysql' in config:
-            try:
-                save_to_mysql(results, "failure_predictions", config)
-            except Exception as e:
-                logger.error(f"MySQL 저장 중 오류: {e}")
-                # MySQL 오류가 발생해도 계속 진행
-        
-        # 결과 시각화 및 저장
-        _save_prediction_results(config, df, target_column, results, prediction_time, model)
-        
-        # API로 결과 전송
-        try:
-            api_sender = APISender(get_api_url())
-            api_success = api_sender.send_failure_prediction(results)
-            if api_success:
-                logger.info("API로 고장 예측 결과 전송 성공")
-            else:
-                logger.warning("API로 고장 예측 결과 전송 실패")
-        except Exception as e:
-            logger.error(f"API 결과 전송 중 오류: {e}")
-            # API 오류가 발생해도 계속 진행
-        
-        logger.info(f"고장 예측 완료: 총 {len(results)}개 결과, 예측된 고장: {results['is_failure_predicted'].sum()}개")
-        return True, results
-    
-    except Exception as e:
-        logger.error(f"예측 수행 중 오류 발생: {e}")
-        return False, None        
 def _create_advanced_features(df):
-    """
-    고급 특성 생성
-    
-    Args:
-        df (pd.DataFrame): 입력 데이터프레임
-        
-    Returns:
-        pd.DataFrame: 고급 특성이 추가된 데이터프레임
-    """
+    """고급 특성 생성"""
     # 기존 데이터프레임 복사
     df_advanced = df.copy()
     
     try:
-        # 1. CPU 관련 복합 지표
-        if 'usage_user' in df.columns and 'usage_system' in df.columns:
-            # CPU 총 사용률: 사용자 + 시스템
-            df_advanced['cpu_total_usage'] = df['usage_user'] + df['usage_system']
+        # 1. 서버 리소스 관련 특성
+        # CPU 관련 특성
+        if 'usage_user' in df.columns:
+            # CPU 사용률 변화율
+            df_advanced['usage_user_change'] = df['usage_user'].diff().fillna(0)
+            # CPU 사용률 이동 평균
+            df_advanced['usage_user_ma'] = df['usage_user'].rolling(window=6, min_periods=1).mean()
+            # CPU 사용률 이동 표준편차 (변동성)
+            df_advanced['usage_user_std'] = df['usage_user'].rolling(window=6, min_periods=1).std().fillna(0)
+            # CPU 고부하 상태
+            df_advanced['high_cpu'] = (df['usage_user'] > 80).astype(float)
         
-        if 'usage_idle' in df.columns:
-            # CPU 부하율: 100 - 유휴율
-            df_advanced['cpu_load'] = 100 - df['usage_idle']
+        # 메모리 관련 특성
+        if 'available_percent' in df.columns:
+            # 메모리 가용률 변화율
+            df_advanced['available_percent_change'] = df['available_percent'].diff().fillna(0)
+            # 메모리 가용률 이동 평균
+            df_advanced['available_percent_ma'] = df['available_percent'].rolling(window=6, min_periods=1).mean()
+            # 낮은 메모리 가용률 상태
+            df_advanced['low_memory'] = (df['available_percent'] < 20).astype(float)
+            # 메모리 사용률 (가용률의 반대)
+            df_advanced['memory_usage'] = 100 - df['available_percent']
         
-        # 2. I/O 대기와 디스크 활동 관계
-        if 'usage_iowait' in df.columns:
-            # I/O 대기 비율에 대한 변화율
-            df_advanced['iowait_change'] = df['usage_iowait'].diff().fillna(0)
-            
-            # I/O 대기 이동 평균 (추세 파악)
-            df_advanced['iowait_ma'] = df['usage_iowait'].rolling(window=5, min_periods=1).mean()
+        # 시스템 로드 관련 특성
+        if 'load1' in df.columns:
+            # 로드 변화율
+            df_advanced['load1_change'] = df['load1'].diff().fillna(0)
+            # 로드 이동 평균
+            df_advanced['load1_ma'] = df['load1'].rolling(window=6, min_periods=1).mean()
+            # 코어 수 대비 고부하 (4코어 가정)
+            cpu_cores = 4  # 서버 코어 수에 맞게 조정
+            df_advanced['high_load'] = (df['load1'] > cpu_cores * 0.7).astype(float)
         
-        # 3. 메모리 관련 지표
-        if 'used_percent' in df.columns and 'available_percent' in df.columns:
-            # 메모리 스트레스 지수: 사용률 / 가용률
-            df_advanced['memory_stress'] = df['used_percent'] / df['available_percent'].clip(lower=0.1)
-        
-        # 4. 온도 관련 지표
-        if 'temp_input' in df.columns:
+        # 2. 환경 데이터 관련 특성
+        # 온도 관련 특성
+        temp_cols = [col for col in df.columns if 'temp' in col.lower()]
+        for col in temp_cols:
             # 온도 변화율
-            df_advanced['temp_change'] = df['temp_input'].diff().fillna(0)
-            
+            df_advanced[f'{col}_change'] = df[col].diff().fillna(0)
             # 온도 이동 평균
-            df_advanced['temp_ma'] = df['temp_input'].rolling(window=5, min_periods=1).mean()
-            
-            # 온도 급상승 지표 (이전 5포인트보다 높은지)
-            df_advanced['temp_surge'] = (
-                df['temp_input'] > df['temp_input'].shift(1).rolling(window=5, min_periods=1).max()
-            ).astype(float)
+            df_advanced[f'{col}_ma'] = df[col].rolling(window=6, min_periods=1).mean()
+            # 고온 상태
+            df_advanced[f'high_{col}'] = (df[col] > 28).astype(float)  # 28도 이상을 고온으로 가정
         
-        # 5. 시간 기반 특성
-        # 타임스탬프에서 시간 정보 추출
+        # 습도 관련 특성
+        if 'sensor_data_humidity' in df.columns:
+            # 습도 변화율
+            df_advanced['humidity_change'] = df['sensor_data_humidity'].diff().fillna(0)
+            # 습도 이동 평균
+            df_advanced['humidity_ma'] = df['sensor_data_humidity'].rolling(window=6, min_periods=1).mean()
+            # 고습 상태
+            df_advanced['high_humidity'] = (df['sensor_data_humidity'] > 70).astype(float)  # 70% 이상을 고습으로 가정
+        
+        # 3. 서버-환경 상관관계 특성
+        # 온도와 CPU 사용률 관계
+        if 'sensor_data_temperature' in df.columns and 'usage_user' in df.columns:
+            # 온도 대비 CPU 사용률 비율
+            df_advanced['temp_cpu_ratio'] = df['sensor_data_temperature'] / df['usage_user'].clip(lower=1)
+            # 온도가 높을 때 CPU 사용률이 높은 상태
+            df_advanced['high_temp_high_cpu'] = ((df['sensor_data_temperature'] > 28) & 
+                                              (df['usage_user'] > 70)).astype(float)
+        
+        # 온도와 메모리 가용률 관계
+        if 'sensor_data_temperature' in df.columns and 'available_percent' in df.columns:
+            # 온도가 높을 때 메모리 가용률이 낮은 상태
+            df_advanced['high_temp_low_mem'] = ((df['sensor_data_temperature'] > 28) & 
+                                             (df['available_percent'] < 30)).astype(float)
+        
+        # 4. 시간 기반 특성
         if isinstance(df.index, pd.DatetimeIndex):
+            # 시간대 특성
             df_advanced['hour'] = df.index.hour
-            df_advanced['day_of_week'] = df.index.dayofweek
+            df_advanced['dayofweek'] = df.index.dayofweek
+            df_advanced['month'] = df.index.month
             
-            # 피크 시간대 플래그 (주간 9-17시)
-            df_advanced['is_peak_hour'] = ((df.index.hour >= 9) & (df.index.hour <= 17)).astype(float)
+            # 주기성 표현
+            df_advanced['hour_sin'] = np.sin(2 * np.pi * df.index.hour / 24)
+            df_advanced['hour_cos'] = np.cos(2 * np.pi * df.index.hour / 24)
+            df_advanced['day_sin'] = np.sin(2 * np.pi * df.index.dayofweek / 7)
+            df_advanced['day_cos'] = np.cos(2 * np.pi * df.index.dayofweek / 7)
+            
+            # 업무 시간대
+            df_advanced['is_business_hour'] = ((df.index.hour >= 9) & 
+                                            (df.index.hour < 18) & 
+                                            (df.index.dayofweek < 5)).astype(float)
         
-        # 결측치 처리
+        # 결측치 제거
         df_advanced = df_advanced.fillna(0)
         
         logger.info(f"고급 특성 생성 완료: {len(df.columns)}개 → {len(df_advanced.columns)}개 특성")
@@ -403,7 +235,6 @@ def _create_advanced_features(df):
         
     except Exception as e:
         logger.error(f"고급 특성 생성 중 오류 발생: {e}")
-        # 오류 발생 시 원본 데이터 반환
         return df
 
 def _save_prediction_results(config, df, target_column, results, prediction_time, model):

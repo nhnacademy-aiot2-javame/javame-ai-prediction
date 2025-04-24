@@ -342,8 +342,12 @@ def main():
         
         # 데이터가 로드되지 않은 경우 로드
         if df is None:
-            logger.info("데이터 로드 중...")
-            df = load_all_data()
+            logger.info("InfluxDB에서 데이터 로드 중...")
+            end_time = datetime.now()
+            start_time = end_time - timedelta(days=30)  # 30일 데이터 로드
+            
+            # origin 태그 기반으로 데이터 로드
+            df = query_influxdb(config, start_time, origins=["server_data", "sensor_data"])
             
             if df is None or df.empty:
                 logger.error("데이터를 로드할 수 없습니다. 종료합니다.")
@@ -384,9 +388,9 @@ def main():
         # 고장 예측 실행
         if args.mode in ['all', 'failure'] and config["failure_prediction"]["enabled"]:
             logger.info("고장 예측 실행 중...")
-            success, results = run_failure_prediction(config, df)
+            failure_success, failure_results = run_failure_prediction(config, df)
             
-            if success:
+            if failure_success:
                 logger.info("고장 예측이 성공적으로 완료되었습니다.")
             else:
                 logger.warning("고장 예측이 실패했거나 결과가 없습니다.")
@@ -394,18 +398,34 @@ def main():
         # 자원 사용량 분석 실행
         if args.mode in ['all', 'resource'] and config["resource_analysis"]["enabled"]:
             logger.info("자원 사용량 분석 실행 중...")
-            try:
-                success, results = run_resource_analysis(config, df)
-            except TypeError:
-                logger.error("자원 사용량 분석 함수가 예상된 반환값을 제공하지 않았습니다.")
-                success, results = False, None
-        
-            if success:
+            resource_success, resource_results = run_resource_analysis(config, df)
+            
+            if resource_success:
                 logger.info("자원 사용량 분석이 성공적으로 완료되었습니다.")
+                
+                # 증설 시점 출력
+                if isinstance(resource_results, dict) and 'expansion_dates' in resource_results:
+                    logger.info("==== 리소스 증설 예측 시점 ====")
+                    for scenario, date in resource_results['expansion_dates'].items():
+                        if date:
+                            logger.info(f"- {scenario} 시나리오: {date.strftime('%Y-%m-%d')}에 증설 필요")
+                        else:
+                            logger.info(f"- {scenario} 시나리오: 예측 기간 내 증설 필요 없음")
+                    
+                    # API로 결과 전송
+                    try:
+                        api_sender = APISender(get_api_url())
+                        api_success = api_sender.send_resource_prediction(resource_results['short_term'])
+                        if api_success:
+                            logger.info("API로 자원 예측 결과 전송 성공")
+                        else:
+                            logger.warning("API로 자원 예측 결과 전송 실패")
+                    except Exception as e:
+                        logger.error(f"API 결과 전송 중 오류: {e}")
             else:
                 logger.warning("자원 사용량 분석이 실패했거나 결과가 없습니다.")
-    
-    logger.info("====== IoT 예측 시스템 실행 완료 ======")
+        
+        logger.info("====== IoT 예측 시스템 실행 완료 ======")
 
 if __name__ == "__main__":
     main()
