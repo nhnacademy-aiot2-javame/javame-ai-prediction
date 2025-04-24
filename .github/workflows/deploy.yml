@@ -15,6 +15,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
+            cd ~/docker/ai-prediction
+            git pull origin main
+
             cd ~/docker
             
             # 서비스 빌드 및 재시작

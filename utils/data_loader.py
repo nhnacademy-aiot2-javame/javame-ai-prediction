@@ -277,66 +277,109 @@ def query_influxdb(config, start_time, measurements=None):
         # 모든 측정명에 대한 쿼리 결과를 담을 DataFrame
         all_data = pd.DataFrame()
         
-        # 각 측정명에 대해 쿼리 실행
+        # 각 측정명마다 개별 쿼리 실행 (타입 충돌 방지)
         for measurement in measurements:
-            query = f'''
-            from(bucket: "{influx_config["bucket"]}")
-              |> range(start: {start_time_str})
-              |> filter(fn: (r) =>
-                   r._measurement == "{measurement}" and
-                   r._field != "room"            // 문자열 필드 제외
-               )
-              |> aggregateWindow(every: 1h, fn: mean, createEmpty: true)
-            '''
-
             logger.info(f"'{measurement}' 측정 쿼리 실행")
             
-            # 쿼리 실행
-            tables = query_api.query(query=query)
+            # 먼저 필드 목록 가져오기
+            field_query = f'''
+            from(bucket: "{influx_config["bucket"]}")
+              |> range(start: {start_time_str})
+              |> filter(fn: (r) => r._measurement == "{measurement}")
+              |> group()
+              |> distinct(column: "_field")
+            '''
             
-            # 결과를 데이터프레임으로 변환
-            df = pd.DataFrame()
-            
-            for table in tables:
-                for record in table.records:
-                    record_df = pd.DataFrame([{
-                        'timestamp': record.get_time(),
-                        'field': record.get_field(),
-                        'value': record.get_value(),
-                        'measurement': record.get_measurement(),
-                        'device_id': record.values.get('device_id', 'unknown')
-                    }])
-                    df = pd.concat([df, record_df])
-
-            # 측정 결과가 있는 경우만 처리
-            if not df.empty:
-                # 값 타입 강제 변환 (object → float), 변환 불가 시 NaN
-                df['value'] = pd.to_numeric(df['value'], errors='coerce')
-                df.dropna(subset=['value'], inplace=True)
+            try:
+                field_tables = query_api.query(query=field_query)
+                fields = []
                 
-                # 타임스탬프를 인덱스로 설정
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                for table in field_tables:
+                    for record in table.records:
+                        field_name = record.values["_field"]
+                        # 문자열 필드는 제외 (uptime_format 등)
+                        if field_name != "uptime_format":
+                            fields.append(field_name)
                 
-                # 필드별 피벗 - measurement 정보 포함하여 컬럼명 생성
-                df_pivot = df.pivot_table(
-                    index='timestamp',
-                    columns=['measurement', 'field'],
-                    values='value',
-                    aggfunc='first'
-                )
+                if not fields:
+                    logger.warning(f"'{measurement}' 측정에서 사용 가능한 필드가 없습니다.")
+                    continue
                 
-                # 다중 인덱스를 단일 컬럼명으로 변환 (measurement_field 형식)
-                df_pivot.columns = [f"{m}_{f}" for m, f in df_pivot.columns]
+                logger.info(f"'{measurement}' 필드 목록: {fields}")
                 
-                # 결과 병합
-                if all_data.empty:
-                    all_data = df_pivot
+                # 각 필드별로 개별 쿼리 실행
+                measurement_df = pd.DataFrame()
+                
+                for field in fields:
+                    try:
+                        # 필드별 쿼리
+                        field_query = f'''
+                        from(bucket: "{influx_config["bucket"]}")
+                          |> range(start: {start_time_str})
+                          |> filter(fn: (r) => r._measurement == "{measurement}" and r._field == "{field}")
+                          |> aggregateWindow(every: 1h, fn: mean, createEmpty: true)
+                        '''
+                        
+                        tables = query_api.query(query=field_query)
+                        
+                        # 결과를 데이터프레임으로 변환
+                        df = pd.DataFrame()
+                        
+                        for table in tables:
+                            for record in table.records:
+                                record_df = pd.DataFrame([{
+                                    'timestamp': record.get_time(),
+                                    'field': field,
+                                    'value': record.get_value(),
+                                    'measurement': measurement,
+                                    'device_id': record.values.get('device_id', 'unknown')
+                                }])
+                                df = pd.concat([df, record_df])
+                        
+                        if not df.empty:
+                            # 값 타입 강제 변환 (object → float), 변환 불가 시 NaN
+                            df['value'] = pd.to_numeric(df['value'], errors='coerce')
+                            df.dropna(subset=['value'], inplace=True)
+                            
+                            # 타임스탬프를 인덱스로 설정
+                            df['timestamp'] = pd.to_datetime(df['timestamp'])
+                            
+                            # 필드별 피벗
+                            df_pivot = df.pivot_table(
+                                index='timestamp',
+                                columns='field',
+                                values='value',
+                                aggfunc='first'
+                            )
+                            
+                            # 측정 항목 결과에 추가
+                            if measurement_df.empty:
+                                measurement_df = df_pivot
+                            else:
+                                measurement_df = measurement_df.join(df_pivot, how='outer')
+                            
+                            logger.info(f"'{measurement}.{field}' 쿼리 성공: {len(df_pivot)}개 행")
+                    except Exception as e:
+                        logger.warning(f"'{measurement}.{field}' 쿼리 중 오류: {e}")
+                
+                # 측정 항목별 결과가 있으면 컬럼명 측정 항목 정보 포함하여 변환
+                if not measurement_df.empty:
+                    # 컬럼명 변환 (field → measurement_field)
+                    measurement_df.columns = [f"{measurement}_{col}" for col in measurement_df.columns]
+                    
+                    # 전체 결과에 추가
+                    if all_data.empty:
+                        all_data = measurement_df
+                    else:
+                        all_data = all_data.join(measurement_df, how='outer')
+                    
+                    logger.info(f"'{measurement}' 측정 쿼리 결과: {len(measurement_df)}개 행, {measurement_df.shape[1]}개 열")
                 else:
-                    all_data = all_data.join(df_pivot, how='outer')
-                
-                logger.info(f"'{measurement}' 측정 쿼리 결과: {len(df_pivot)}개 행, {df_pivot.shape[1]}개 열")
-            else:
-                logger.warning(f"'{measurement}' 측정 쿼리 결과가 없습니다.")
+                    logger.warning(f"'{measurement}' 측정 쿼리 결과가 없습니다.")
+            
+            except Exception as e:
+                logger.error(f"'{measurement}' 필드 목록 쿼리 중 오류: {e}")
+                continue
                 
         # 결과가 비어있는지 확인
         if all_data.empty:
