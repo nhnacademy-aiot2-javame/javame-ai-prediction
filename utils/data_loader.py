@@ -238,7 +238,7 @@ def query_influxdb(config, start_time, origins=None):
     Args:
         config (dict): InfluxDB 설정
         start_time (datetime): 쿼리 시작 시간
-        origins (list): 쿼리할 origin 목록 (None이면 모든 origin)
+        origins (list): 쿼리할 origin 목록 (None이면 기본값 사용)
         
     Returns:
         pd.DataFrame: 쿼리 결과
@@ -247,7 +247,7 @@ def query_influxdb(config, start_time, origins=None):
     
     # origin 목록 처리
     if origins is None:
-        origins = ["server_data", "sensor_data"]  # 기본값
+        origins = influx_config.get("origins", ["server_data", "sensor_data"])  # 기본값
     elif isinstance(origins, str):
         origins = [origins]
     
