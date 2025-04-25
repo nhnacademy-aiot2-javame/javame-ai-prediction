@@ -122,16 +122,17 @@ def test_influxdb_connection(config):
             logger.info(f"사용 가능한 버킷: {bucket_names}")
             return False
         
-        # 샘플 쿼리 실행
-        measurement = influx_config.get("measurement", "")
-        if measurement:
+        # 샘플 쿼리 실행 - origin 태그 기반으로 변경
+        origins = influx_config.get("origins", ["server_data", "sensor_data"])
+        
+        if origins:
             try:
-                # 지난 24시간 데이터 쿼리
+                # 지난 24시간 데이터 쿼리 - 첫 번째 origin으로 테스트
                 start_time = datetime.now() - pd.Timedelta(hours=24)
                 query = f'''
                 from(bucket: "{influx_config["bucket"]}")
                 |> range(start: {start_time.strftime("%Y-%m-%dT%H:%M:%SZ")})
-                |> filter(fn: (r) => r._measurement == "{measurement}")
+                |> filter(fn: (r) => r["origin"] == "{origins[0]}")
                 |> limit(n: 5)
                 '''
                 
@@ -141,7 +142,7 @@ def test_influxdb_connection(config):
                     record_count = sum(1 for table in tables for _ in table.records)
                     logger.info(f"쿼리 성공: {record_count}개 레코드 검색됨")
                 else:
-                    logger.warning(f"쿼리 결과가 없습니다. measurement '{measurement}'를 확인하세요.")
+                    logger.warning(f"쿼리 결과가 없습니다. origin '{origins[0]}'를 확인하세요.")
             except Exception as e:
                 logger.warning(f"샘플 쿼리 실행 중 오류: {e}")
         

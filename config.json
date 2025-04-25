@@ -3,13 +3,10 @@
         "url": "http://localhost:10288",
         "token": "g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==",
         "org": "javame",
-        "bucket": "aiot",
-        "measurements": [
-            "system",
-            "cpu",
-            "memory",
-            "disk",
-            "sensors"
+        "bucket": "data",
+        "origins": [
+            "server_data",
+            "sensor_data"
         ]
     },
     "mysql": {
