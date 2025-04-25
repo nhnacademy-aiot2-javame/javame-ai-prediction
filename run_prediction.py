@@ -233,7 +233,7 @@ def main():
     ensure_dir(config["results"].get("model_dir", "model_weights"))
     ensure_dir(os.path.dirname(config["logging"]["log_file"]))
     
-    # 데이터 로드 변수
+    # 데이터 로드 변수 
     df = None
     
     # 테스트 모드 설정
