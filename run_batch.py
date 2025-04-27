@@ -24,8 +24,8 @@ def main():
     parser = argparse.ArgumentParser(description='IoT 예측 시스템 배치 애플리케이션')
     
     parser.add_argument('--mode', type=str, default='all', 
-                        choices=['all', 'failure', 'resource'],
-                        help='실행 모드 (all, failure, resource)')
+                        choices=['all', 'failure', 'resource', 'multi'],
+                        help='실행 모드 (all, failure, resource, multi)')
     
     parser.add_argument('--scheduler', action='store_true',
                         help='스케줄러 모드로 실행 (배치 러너 실행)')
@@ -38,6 +38,9 @@ def main():
     
     parser.add_argument('--config', type=str, default='config.json',
                         help='설정 파일 경로')
+    
+    parser.add_argument('--location', type=str, default=None,
+                        help='특정 위치만 처리 (지정하지 않으면 모든 위치)')
     
     args = parser.parse_args()
     
@@ -78,14 +81,29 @@ def main():
     else:
         # 단일 실행 모드
         logger.info(f"단일 실행 모드로 실행합니다. (모드: {args.mode})")
-        success = run_prediction_job(mode=args.mode)
         
-        if success:
-            logger.info(f"예측 작업 '{args.mode}' 모드 실행 성공.")
+        # 실행 모드에 따라 적절한 함수 호출
+        if args.mode == 'multi':
+            # 위치별, 자원별 다중 예측 모드 실행
+            from run_prediction import run_multi_resource_prediction
+            results = run_multi_resource_prediction(config)
+            
+            # 결과 요약 출력
+            for location, location_results in results.items():
+                logger.info(f"위치 '{location}' 예측 완료: {len(location_results.get('resources', {}))}개 자원 처리됨")
+            
+            logger.info(f"다중 예측 모드 실행 성공.")
             sys.exit(0)
         else:
-            logger.error(f"예측 작업 '{args.mode}' 모드 실행 실패.")
-            sys.exit(1)
+            # 기존 모드 (all, failure, resource) 실행
+            success = run_prediction_job(mode=args.mode)
+            
+            if success:
+                logger.info(f"예측 작업 '{args.mode}' 모드 실행 성공.")
+                sys.exit(0)
+            else:
+                logger.error(f"예측 작업 '{args.mode}' 모드 실행 실패.")
+                sys.exit(1)
 
 if __name__ == "__main__":
     main()

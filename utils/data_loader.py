@@ -231,14 +231,15 @@ def load_all_data():
         logger.error(f"최종 데이터 병합 중 오류: {e}")
         return pd.DataFrame()
 
-def query_influxdb(config, start_time, origins=None):
+def query_influxdb(config, start_time, origins=None, location=None):
     """
-    InfluxDB에서 데이터 쿼리 (origin 태그 기반)
+    InfluxDB에서 데이터 쿼리 (origin 태그 및 location 기반)
     
     Args:
         config (dict): InfluxDB 설정
         start_time (datetime): 쿼리 시작 시간
         origins (list): 쿼리할 origin 목록 (None이면 기본값 사용)
+        location (str): 위치 정보 (None이면 모든 위치)
         
     Returns:
         pd.DataFrame: 쿼리 결과
@@ -256,6 +257,8 @@ def query_influxdb(config, start_time, origins=None):
         masked_token = influx_config["token"][:4] + "..." if len(influx_config["token"]) > 4 else "***"
         logger.info(f"InfluxDB 연결 시도: URL={influx_config['url']}, Org={influx_config['org']}, Bucket={influx_config['bucket']}, Token={masked_token}")
         logger.info(f"쿼리 대상 origins: {origins}")
+        if location:
+            logger.info(f"쿼리 대상 location: {location}")
         
         client = InfluxDBClient(
             url=influx_config["url"],
@@ -275,13 +278,19 @@ def query_influxdb(config, start_time, origins=None):
         for origin in origins:
             logger.info(f"'{origin}' origin 쿼리 실행")
             
-            # pivot 쿼리 사용하여 필드를 컬럼으로 변환
+            # 기본 쿼리
             query = f'''
             from(bucket: "{influx_config["bucket"]}")
               |> range(start: {start_time_str})
               |> filter(fn: (r) => r["origin"] == "{origin}")
-              |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
             '''
+            
+            # location 필터 추가 (제공된 경우)
+            if location is not None:
+                query += f'  |> filter(fn: (r) => r["location"] == "{location}")'
+                
+            # pivot을 사용하여 필드를 컬럼으로 변환
+            query += '  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")'
             
             try:
                 # 데이터프레임으로 직접 쿼리
@@ -292,7 +301,10 @@ def query_influxdb(config, start_time, origins=None):
                     result = pd.concat(result)
                 
                 if result.empty:
-                    logger.warning(f"'{origin}' origin에서 데이터가 없습니다.")
+                    if location:
+                        logger.warning(f"'{origin}' origin, '{location}' location에서 데이터가 없습니다.")
+                    else:
+                        logger.warning(f"'{origin}' origin에서 데이터가 없습니다.")
                     continue
                 
                 # _time을 인덱스로 설정
@@ -300,7 +312,7 @@ def query_influxdb(config, start_time, origins=None):
                     result.set_index('_time', inplace=True)
                 
                 # 불필요한 메타데이터 컬럼 제거
-                exclude_cols = ['result', 'table', '_start', '_stop', '_measurement']
+                exclude_cols = ['result', 'table', '_start', '_stop', '_measurement', 'location']
                 data_cols = [col for col in result.columns if col not in exclude_cols]
                 
                 # origin 식별을 위한 접두어 추가
@@ -318,20 +330,30 @@ def query_influxdb(config, start_time, origins=None):
                 else:
                     all_data = all_data.join(origin_df, how='outer')
                 
-                logger.info(f"'{origin}' origin 쿼리 결과: {len(origin_df)}개 행, {origin_df.shape[1]}개 열")
+                if location:
+                    logger.info(f"'{origin}' origin, '{location}' location 쿼리 결과: {len(origin_df)}개 행, {origin_df.shape[1]}개 열")
+                else:
+                    logger.info(f"'{origin}' origin 쿼리 결과: {len(origin_df)}개 행, {origin_df.shape[1]}개 열")
             
             except Exception as e:
-                logger.error(f"'{origin}' origin 쿼리 중 오류: {e}")
+                if location:
+                    logger.error(f"'{origin}' origin, '{location}' location 쿼리 중 오류: {e}")
+                else:
+                    logger.error(f"'{origin}' origin 쿼리 중 오류: {e}")
                 continue
                 
         # 결과가 비어있는지 확인
         if all_data.empty:
-            logger.warning(f"모든 origin에 대한 쿼리 결과가 비어있습니다.")
+            if location:
+                logger.warning(f"모든 origin에 대한 '{location}' location 쿼리 결과가 비어있습니다.")
+            else:
+                logger.warning(f"모든 origin에 대한 쿼리 결과가 비어있습니다.")
             return pd.DataFrame()
         
         # 결측치 처리
         all_data = all_data.interpolate(method='time')
         
+        # 결과 정보 출력
         logger.info(f"InfluxDB 최종 쿼리 결과: {len(all_data)}개 행, {all_data.shape[1]}개 열")
         logger.info(f"컬럼: {list(all_data.columns)[:10]}{'...' if len(all_data.columns) > 10 else ''}")
         
@@ -344,90 +366,59 @@ def query_influxdb(config, start_time, origins=None):
     finally:
         if 'client' in locals():
             client.close()
-
-def load_influxdb_csv_data(csv_path):
+def get_available_locations(config):
     """
-    InfluxDB 형식의 CSV 파일을 직접 로드하고 처리
+    사용 가능한 location 목록 조회
     
     Args:
-        csv_path (str): CSV 파일 경로
+        config (dict): InfluxDB 설정
         
     Returns:
-        pd.DataFrame: 처리된 데이터프레임
+        list: 사용 가능한 location 목록
     """
-    logger.info(f"InfluxDB CSV 데이터 파일 로드 중: {csv_path}")
+    # 1. 설정 파일에 정의된 locations 있으면 사용
+    if "locations" in config["influxdb"]:
+        return config["influxdb"]["locations"]
     
+    # 2. 설정에 없으면 InfluxDB에서 직접 쿼리
     try:
-        # 파일 존재 확인
-        if not os.path.exists(csv_path):
-            logger.error(f"CSV 파일이 존재하지 않습니다: {csv_path}")
-            return pd.DataFrame()
+        client = InfluxDBClient(
+            url=config["influxdb"]["url"],
+            token=config["influxdb"]["token"],
+            org=config["influxdb"]["org"]
+        )
         
-        # 파일 크기 확인
-        file_size = os.path.getsize(csv_path)
-        if file_size == 0:
-            logger.error(f"CSV 파일이 비어 있습니다: {csv_path}")
-            return pd.DataFrame()
+        query_api = client.query_api()
         
-        # InfluxDB CSV는 처음 3줄이 메타데이터임
-        df = pd.read_csv(csv_path, skiprows=3)
+        # 유니크한 location 값 쿼리
+        query = f'''
+        from(bucket: "{config["influxdb"]["bucket"]}")
+          |> range(start: -30d)
+          |> group(columns: ["location"])
+          |> distinct(column: "location")
+        '''
         
-        # 컬럼 이름 정리
-        df.columns = [col.strip() for col in df.columns]
+        result = query_api.query_data_frame(query)
         
-        # 필요한 컬럼 확인
-        required_columns = ['_time', '_value', '_field', '_measurement']
-        missing_columns = [col for col in required_columns if col not in df.columns]
+        if isinstance(result, list):
+            result = pd.concat(result)
         
-        if missing_columns:
-            logger.error(f"필수 컬럼이 누락되었습니다: {missing_columns}")
-            return pd.DataFrame()
+        if not result.empty and "location" in result.columns:
+            locations = result["location"].unique().tolist()
+            logger.info(f"InfluxDB에서 {len(locations)}개 location 조회됨: {locations}")
+            return locations
         
-        # 타임스탬프 변환
-        try:
-            df['_time'] = pd.to_datetime(df['_time'])
-        except Exception as e:
-            logger.warning(f"시간 변환 중 오류: {e}, 대체 방법 시도")
-            
-            # 대체 방법: 나노초 부분을 제거하고 파싱
-            df['_time'] = pd.to_datetime(df['_time'].astype(str).str.replace(r'\.\d+Z$', 'Z', regex=True))
-        
-        # 숫자형 값으로 변환
-        df['_value'] = pd.to_numeric(df['_value'], errors='coerce')
-        
-        # 결측치 제거
-        df = df.dropna(subset=['_value'])
-        
-        # 인덱스 설정
-        df.set_index('_time', inplace=True)
-        
-        # 중복 인덱스 제거
-        df = df[~df.index.duplicated(keep='first')]
-        
-        # 시간 순으로 정렬
-        df = df.sort_index()
-        
-        # 필드별로 피벗 (여러 필드가 있는 경우)
-        if '_field' in df.columns and df['_field'].nunique() > 1:
-            # 각 필드를 별도 컬럼으로 변환
-            df_pivot = df.pivot_table(
-                index=df.index,
-                columns='_field',
-                values='_value',
-                aggfunc='first'
-            )
-            return df_pivot
-        else:
-            # 단일 필드인 경우 그대로 반환
-            if '_field' in df.columns and df['_field'].nunique() == 1:
-                field_name = df['_field'].iloc[0]
-                return df[['_value']].rename(columns={'_value': field_name})
-            else:
-                return df[['_value']]
-            
     except Exception as e:
-        logger.error(f"CSV 파일 로드 중 예상치 못한 오류: {e}")
-        return pd.DataFrame()
+        logger.error(f"사용 가능한 location 목록 조회 중 오류: {e}")
+    
+    finally:
+        if 'client' in locals():
+            client.close()
+    
+    # 3. 실패하면 기본값 반환
+    default_locations = ["server_room", "입구"]
+    logger.warning(f"사용 가능한 location 목록 조회 실패, 기본값 사용: {default_locations}")
+    return default_locations
 
 def generate_test_data(days=30, hour_interval=1, start_time=None, cols=None):
     """

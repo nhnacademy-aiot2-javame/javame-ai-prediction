@@ -28,13 +28,15 @@ class APISender:
         """
         self.api_url = api_url
     
-    def send_failure_prediction(self, results):
+    def send_failure_prediction(self, results, location=None, resource_type=None):
         """
         고장 예측 결과 전송
         
         Args:
             results (pd.DataFrame): 고장 예측 결과
-            
+            location (str, optional): 위치 정보
+            resource_type (str, optional): 자원 유형
+                
         Returns:
             bool: 전송 성공 여부
         """
@@ -44,7 +46,7 @@ class APISender:
         
         try:
             # 데이터 변환
-            payload = self._convert_failure_results(results)
+            payload = self._convert_failure_results(results, location, resource_type)
             
             # API 호출
             logger.info(f"고장 예측 결과 전송 중: {len(results)}개 레코드")
@@ -66,14 +68,17 @@ class APISender:
         except Exception as e:
             logger.error(f"고장 예측 결과 전송 중 오류 발생: {e}")
             return False
+
     
-    def send_resource_prediction(self, results):
+    def send_resource_prediction(self, results, location=None, resource_type=None):
         """
         자원 사용량 예측 결과 전송
         
         Args:
             results (pd.DataFrame): 자원 사용량 예측 결과
-            
+            location (str, optional): 위치 정보
+            resource_type (str, optional): 자원 유형
+                
         Returns:
             bool: 전송 성공 여부
         """
@@ -83,7 +88,7 @@ class APISender:
         
         try:
             # 데이터 변환
-            payload = self._convert_resource_results(results)
+            payload = self._convert_resource_results(results, location, resource_type)
             
             # API 호출
             logger.info(f"자원 사용량 예측 결과 전송 중: {len(results)}개 레코드")
@@ -106,13 +111,15 @@ class APISender:
             logger.error(f"자원 사용량 예측 결과 전송 중 오류 발생: {e}")
             return False
     
-    def _convert_failure_results(self, results):
+    def _convert_failure_results(self, results, location=None, resource_type=None):
         """
         고장 예측 결과를 API 요청 형식으로 변환
         
         Args:
             results (pd.DataFrame): 고장 예측 결과
-            
+            location (str, optional): 위치 정보
+            resource_type (str, optional): 자원 유형
+                
         Returns:
             dict: API 요청 페이로드
         """
@@ -125,6 +132,13 @@ class APISender:
         
         if 'prediction_time' in df.columns:
             df['prediction_time'] = df['prediction_time'].dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+        
+        # location 및 resource_type 추가 (파라미터로 제공된 경우)
+        if location is not None and 'location' not in df.columns:
+            df['location'] = location
+        
+        if resource_type is not None and 'resource_type' not in df.columns:
+            df['resource_type'] = resource_type
         
         # 기본 payload 구조
         payload = {
@@ -138,13 +152,15 @@ class APISender:
         
         return payload
     
-    def _convert_resource_results(self, results):
+    def _convert_resource_results(self, results, location=None, resource_type=None):
         """
         자원 사용량 예측 결과를 API 요청 형식으로 변환
         
         Args:
             results (pd.DataFrame): 자원 사용량 예측 결과
-            
+            location (str, optional): 위치 정보
+            resource_type (str, optional): 자원 유형
+                
         Returns:
             dict: API 요청 페이로드
         """
@@ -158,6 +174,13 @@ class APISender:
         if 'prediction_time' in df.columns:
             df['prediction_time'] = df['prediction_time'].dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
         
+        # location 및 resource_type 추가 (파라미터로 제공된 경우)
+        if location is not None and 'location' not in df.columns:
+            df['location'] = location
+        
+        if resource_type is not None and 'resource_type' not in df.columns:
+            df['resource_type'] = resource_type
+        
         # 기본 payload 구조
         payload = {
             "predictions": df.to_dict(orient="records"),
@@ -169,7 +192,30 @@ class APISender:
         }
         
         return payload
-
+    def send_multi_location_predictions(self, location, results):
+        """
+        위치별 통합 예측 결과 전송
+        
+        Args:
+            location (str): 위치 정보
+            results (dict): 통합 예측 결과
+            
+        Returns:
+            bool: 전송 성공 여부
+        """
+        success = True
+        
+        # 고장 예측 결과 전송
+        if "failure_prediction" in results and results["failure_prediction"] is not None:
+            if not self.send_failure_prediction(results["failure_prediction"], location):
+                success = False
+        
+        # 자원 사용량 예측 결과 전송
+        if "resource_prediction" in results and results["resource_prediction"] is not None:
+            if not self.send_resource_prediction(results["resource_prediction"], location):
+                success = False
+        
+        return success
 # API URL을 환경 변수에서 가져오는 함수 
 def get_api_url():
     """

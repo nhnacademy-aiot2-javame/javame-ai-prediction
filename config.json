@@ -17,6 +17,38 @@
         "password": "ryL7LcSp@Yiz[bR7",
         "database": "aiot02_team3"
     },
+    "resources": {
+        "cpu": {
+            "target_columns": ["usage_user", "usage_system", "usage_idle"],
+            "failure_threshold": 85,
+            "capacity_threshold": 80,
+            "input_window": 360
+        },
+        "memory": {
+            "target_columns": ["used_percent", "available_percent"],
+            "failure_threshold": 90,
+            "capacity_threshold": 85,
+            "input_window": 240
+        },
+        "disk": {
+            "target_columns": ["used_percent"],
+            "failure_threshold": 90,
+            "capacity_threshold": 85,
+            "input_window": 480
+        },
+        "network": {
+            "target_columns": ["bytes_sent", "bytes_recv"],
+            "failure_threshold": 0,
+            "capacity_threshold": 0,
+            "input_window": 120
+        },
+        "temperature": {
+            "target_columns": ["temp_input"],
+            "failure_threshold": 75,
+            "capacity_threshold": 0,
+            "input_window": 240
+        }
+    },
     "failure_prediction": {
         "enabled": true,
         "interval_hours": 6,

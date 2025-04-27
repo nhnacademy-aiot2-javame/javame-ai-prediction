@@ -190,7 +190,206 @@ def scheduled_resource_analysis(config):
     
     except Exception as e:
         logger.error(f"자원 사용량 분석 중 오류 발생: {e}", exc_info=True)
-
+def run_multi_resource_prediction(config):
+    """
+    위치별, 자원별 예측 실행
+    
+    Args:
+        config (dict): 설정 정보
+        
+    Returns:
+        dict: 위치별, 자원별 예측 결과
+    """
+    logger.info("======= 위치별, 자원별 예측 실행 =======")
+    
+    # 결과 저장용 딕셔너리
+    results = {}
+    
+    # 사용 가능한 위치 목록 조회
+    locations = get_available_locations(config)
+    logger.info(f"예측 수행할 위치 목록: {locations}")
+    
+    # 리소스 유형 목록
+    resource_types = ["cpu", "memory", "disk", "network", "temperature"]
+    if "resources" in config:
+        resource_types = list(config["resources"].keys())
+    
+    # 모델 관리자 생성
+    from models.lstm_model import ResourceModelManager
+    model_manager = ResourceModelManager(config)
+    
+    # 각 위치별로 처리
+    for location in locations:
+        logger.info(f"위치 '{location}'에 대한 예측 처리 중...")
+        location_results = {}
+        
+        # 데이터 로드 (30일 데이터)
+        df = query_influxdb(config, datetime.now() - timedelta(days=30), location=location)
+        
+        if df is None or df.empty:
+            logger.warning(f"위치 '{location}'에 대한 데이터가 없습니다.")
+            continue
+        
+        # 각 자원별 모델 학습 및 예측
+        for resource_type in resource_types:
+            # 리소스 설정 로드
+            resource_config = config.get("resources", {}).get(resource_type, {})
+            target_columns = resource_config.get("target_columns", [])
+            
+            # 특정 자원 타입에 대한 타겟 열이 설정에 없는 경우
+            if not target_columns:
+                # 기본 타겟 열 적용
+                if resource_type == "cpu":
+                    target_columns = ["usage_user", "usage_system", "usage_idle"]
+                elif resource_type == "memory":
+                    target_columns = ["used_percent", "available_percent"]
+                elif resource_type == "disk":
+                    target_columns = ["used_percent"]
+                elif resource_type == "network":
+                    target_columns = ["bytes_sent", "bytes_recv"]
+                elif resource_type == "temperature":
+                    target_columns = ["temp_input"]
+            
+            # 해당 자원에 관련된 컬럼이 있는지 확인
+            available_columns = [col for col in target_columns if col in df.columns]
+            
+            if not available_columns:
+                logger.info(f"위치 '{location}'에 '{resource_type}' 자원 데이터가 없습니다.")
+                continue
+            
+            # 대표 타겟 컬럼 선택
+            target_column = available_columns[0]
+            logger.info(f"위치 '{location}'의 '{resource_type}' 자원 타겟 컬럼: {target_column}")
+            
+            # 모델 생성 또는 가져오기
+            model = model_manager.get_or_create_model(
+                location, 
+                resource_type, 
+                df.shape[1], 
+                resource_config.get("input_window", config["failure_prediction"]["input_window"])
+            )
+            
+            # 데이터 전처리
+            processed_df = preprocess_data(df, target_column)
+            
+            # 모델 학습
+            logger.info(f"위치 '{location}'의 '{resource_type}' 자원에 대한 모델 학습 중...")
+            try:
+                if isinstance(model, FailureLSTM):
+                    threshold = resource_config.get("failure_threshold", config["failure_prediction"]["threshold"])
+                    model.fit(processed_df, target_column, failure_threshold=threshold)
+                else:
+                    model.fit(processed_df, target_column)
+                
+                # 예측 수행
+                if isinstance(model, FailureLSTM):
+                    pred_results = model.predict(processed_df)
+                    location_results[resource_type] = {
+                        "failure_prediction": pred_results
+                    }
+                else:
+                    pred_results = model.predict(processed_df, target_column)
+                    try:
+                        capacity_threshold = resource_config.get(
+                            "capacity_threshold", 
+                            config["resource_analysis"]["capacity_threshold"]
+                        )
+                        scenario_results, expansion_dates = model.predict_long_term(
+                            periods=180,
+                            capacity_threshold=capacity_threshold
+                        )
+                        location_results[resource_type] = {
+                            "resource_prediction": pred_results,
+                            "long_term": scenario_results,
+                            "expansion_dates": expansion_dates
+                        }
+                    except Exception as e:
+                        logger.error(f"장기 예측 실패: {e}")
+                        location_results[resource_type] = {
+                            "resource_prediction": pred_results
+                        }
+                
+                logger.info(f"위치 '{location}'의 '{resource_type}' 자원 예측 완료")
+                
+                # 결과 시각화 및 저장
+                if config["results"]["save_plots"]:
+                    save_dir = os.path.join(
+                        config["results"]["save_dir"],
+                        location,
+                        resource_type,
+                        datetime.now().strftime("%Y%m%d_%H%M%S")
+                    )
+                    
+                    os.makedirs(save_dir, exist_ok=True)
+                    
+                    if isinstance(model, FailureLSTM):
+                        plot_failure_prediction(
+                            processed_df, 
+                            target_column, 
+                            pred_results,
+                            threshold=threshold,
+                            save_path=os.path.join(save_dir, "failure_prediction_results.png")
+                        )
+                    else:
+                        plot_resource_prediction(
+                            processed_df, 
+                            target_column, 
+                            pred_results,
+                            save_path=os.path.join(save_dir, "resource_prediction_results.png")
+                        )
+                        
+                        if "long_term" in location_results[resource_type]:
+                            plot_long_term_scenarios(
+                                location_results[resource_type]["long_term"],
+                                capacity_threshold=capacity_threshold,
+                                expansion_dates=location_results[resource_type]["expansion_dates"],
+                                save_path=os.path.join(save_dir, "long_term_scenarios.png")
+                            )
+                
+            except Exception as e:
+                logger.error(f"위치 '{location}'의 '{resource_type}' 자원 예측 중 오류 발생: {e}")
+                logger.error(traceback.format_exc())
+        
+        # 예측 결과 통합
+        try:
+            aggregated_results = model_manager.aggregate_predictions(location, location_results)
+            
+            # 위치별 결과 저장
+            results[location] = {
+                "resources": location_results,
+                "aggregated": aggregated_results
+            }
+            
+            # MySQL 저장
+            if 'mysql' in config:
+                if "failure_prediction" in aggregated_results and aggregated_results["failure_prediction"] is not None:
+                    save_to_mysql(
+                        aggregated_results["failure_prediction"].reset_index(), 
+                        "failure_predictions", 
+                        config
+                    )
+                
+                if "resource_prediction" in aggregated_results and aggregated_results["resource_prediction"] is not None:
+                    save_to_mysql(
+                        aggregated_results["resource_prediction"].reset_index(), 
+                        "resource_predictions", 
+                        config
+                    )
+            
+            # API 전송
+            try:
+                api_sender = APISender(get_api_url())
+                api_sender.send_multi_location_predictions(location, aggregated_results)
+            except Exception as e:
+                logger.error(f"API 결과 전송 중 오류: {e}")
+            
+            logger.info(f"위치 '{location}' 예측 결과 통합 및 저장 완료")
+        except Exception as e:
+            logger.error(f"위치 '{location}' 결과 통합 중 오류 발생: {e}")
+            logger.error(traceback.format_exc())
+    
+    # 결과 반환
+    return results
 def main():
     """메인 함수"""
     # 명령행 인자 파싱

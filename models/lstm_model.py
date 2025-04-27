@@ -786,3 +786,151 @@ class ResourceLSTM(BaseTimeSeriesModel):
             info["final_val_mae"] = float(self.history.history['val_mae'][-1])
         
         return info
+    
+class ResourceModelManager:
+    """자원별 모델 관리 클래스"""
+    
+    def __init__(self, config):
+        """
+        자원별 모델 관리자 초기화
+        
+        Args:
+            config (dict): 설정 정보
+        """
+        self.config = config
+        self.models = {}  # location+resource별 모델 저장
+    
+    def get_or_create_model(self, location, resource_type, input_dim, input_window):
+        """
+        특정 location과 resource_type에 대한 모델 반환(없으면 생성)
+        
+        Args:
+            location (str): 위치 정보
+            resource_type (str): 자원 유형 (cpu, memory, disk 등)
+            input_dim (int): 입력 차원
+            input_window (int): 입력 윈도우 크기
+            
+        Returns:
+            BaseTimeSeriesModel: 해당 자원의 모델
+        """
+        model_key = f"{location}_{resource_type}"
+        
+        if model_key not in self.models:
+            # 리소스별 설정 로드
+            resource_config = self.config.get("resources", {}).get(resource_type, {})
+            
+            # 모델 저장 경로
+            model_dir = self.config["results"].get("model_dir", "model_weights")
+            os.makedirs(model_dir, exist_ok=True)
+            
+            # 모델 종류 결정
+            if resource_type in ["temperature", "cpu", "memory"]:
+                # 고장 예측에 적합한 모델 선택
+                model = FailureLSTM(
+                    input_dim=input_dim,
+                    input_window=resource_config.get("input_window", input_window),
+                    model_save_path=f"{model_dir}/{model_key}_failure.h5"
+                )
+            else:
+                # 자원 사용량 예측에 적합한 모델 선택
+                model = ResourceLSTM(
+                    input_dim=input_dim,
+                    input_window=resource_config.get("input_window", input_window),
+                    model_save_path=f"{model_dir}/{model_key}_resource.h5"
+                )
+            
+            self.models[model_key] = model
+        
+        return self.models[model_key]
+    
+    def aggregate_predictions(self, location, predictions):
+        """
+        여러 자원의 예측 결과를 통합
+        
+        Args:
+            location (str): 위치 정보
+            predictions (dict): 자원별 예측 결과
+            
+        Returns:
+            dict: 통합된 예측 결과
+        """
+        # 기본 결과 구조
+        aggregated = {
+            "failure_prediction": None,
+            "resource_prediction": None
+        }
+        
+        # 고장 예측 결과 통합
+        failure_preds = []
+        failure_weights = []
+        
+        # 자원 사용량 예측 결과 통합
+        resource_preds = []
+        
+        # 각 자원별 결과 처리
+        for resource_type, resource_results in predictions.items():
+            # 고장 예측 결과 처리
+            if "failure_prediction" in resource_results and not resource_results["failure_prediction"].empty:
+                pred_df = resource_results["failure_prediction"].copy()
+                
+                # 리소스별 가중치 설정 (중요도에 따라 조정 가능)
+                weight = 1.0
+                if resource_type == "temperature":
+                    weight = 2.0  # 온도는 고장 예측에 더 중요
+                elif resource_type == "cpu":
+                    weight = 1.5  # CPU도 중요도 높음
+                
+                failure_preds.append(pred_df)
+                failure_weights.append(weight)
+            
+            # 자원 사용량 예측 결과 처리
+            if "resource_prediction" in resource_results and not resource_results["resource_prediction"].empty:
+                pred_df = resource_results["resource_prediction"].copy()
+                pred_df["resource_type"] = resource_type
+                resource_preds.append(pred_df)
+        
+        # 고장 예측 결과 통합
+        if failure_preds:
+            # 공통 인덱스 찾기
+            common_idx = failure_preds[0].index
+            for df in failure_preds[1:]:
+                common_idx = common_idx.intersection(df.index)
+            
+            # 가중 평균 계산
+            if len(common_idx) > 0:
+                aggregated_failure = pd.DataFrame(index=common_idx)
+                aggregated_failure["failure_probability"] = 0.0
+                aggregated_failure["is_failure_predicted"] = False
+                
+                total_weight = sum(failure_weights)
+                
+                for df, weight in zip(failure_preds, failure_weights):
+                    # 공통 인덱스만 선택
+                    df_common = df.loc[common_idx]
+                    
+                    # 가중치 적용
+                    normalized_weight = weight / total_weight
+                    aggregated_failure["failure_probability"] += df_common["failure_probability"] * normalized_weight
+                
+                # 최종 고장 예측 여부 결정
+                aggregated_failure["is_failure_predicted"] = aggregated_failure["failure_probability"] > 0.5
+                
+                # 메타데이터 추가
+                aggregated_failure["location"] = location
+                aggregated_failure["device_id"] = "server_001"  # 기본값
+                aggregated_failure["prediction_time"] = datetime.now()
+                
+                # 결과 설정
+                aggregated["failure_prediction"] = aggregated_failure
+        
+        # 자원 사용량 예측 결과 통합 (모든 리소스 타입 포함)
+        if resource_preds:
+            # 모든 결과 병합
+            aggregated["resource_prediction"] = pd.concat(resource_preds)
+            
+            # 메타데이터 추가
+            aggregated["resource_prediction"]["location"] = location
+            aggregated["resource_prediction"]["device_id"] = "server_001"  # 기본값
+            aggregated["resource_prediction"]["prediction_time"] = datetime.now()
+        
+        return aggregated

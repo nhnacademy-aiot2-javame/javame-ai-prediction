@@ -190,10 +190,14 @@ def init_mysql(config):
             id INT AUTO_INCREMENT PRIMARY KEY,
             timestamp DATETIME,
             device_id VARCHAR(50),
+            location VARCHAR(50),
+            resource_type VARCHAR(50),
             failure_probability FLOAT,
             is_failure_predicted BOOLEAN,
             prediction_time DATETIME,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_location (location),
+            INDEX idx_resource_type (resource_type)
         )
         """)
         
@@ -203,10 +207,13 @@ def init_mysql(config):
             id INT AUTO_INCREMENT PRIMARY KEY,
             timestamp DATETIME,
             device_id VARCHAR(50),
+            location VARCHAR(50),
             resource_type VARCHAR(50),
             predicted_value FLOAT,
             prediction_time DATETIME,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_location (location),
+            INDEX idx_resource_type (resource_type)
         )
         """)
         
@@ -214,12 +221,15 @@ def init_mysql(config):
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS capacity_planning (
             id INT AUTO_INCREMENT PRIMARY KEY,
+            location VARCHAR(50),
             scenario VARCHAR(50),
             resource_type VARCHAR(50),
             expansion_date DATE,
             threshold_value FLOAT,
             prediction_time DATETIME,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_location (location),
+            INDEX idx_resource_type (resource_type)
         )
         """)
         
