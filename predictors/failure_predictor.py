@@ -122,7 +122,7 @@ def run_failure_prediction(config, df=None):
             save_to_mysql(results, "failure_predictions", config)
         
         # 결과 시각화 및 저장
-        _save_failure_prediction_results(
+        _save_prediction_results(
             config, df, target_column, results, 
             datetime.now(), model
         )

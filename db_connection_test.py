@@ -49,8 +49,8 @@ def test_influxdb_connection(config):
         return False
     
     try:
-        logger.info(f"InfluxDB 연결 시도: {influx_config['url']}")
-        
+        # 토큰 출력 시 마스킹 처리 제거
+        logger.info(f"InfluxDB 연결 시도: URL={influx_config['url']}, Token={influx_config['token']}")        
         # 클라이언트 생성
         client = InfluxDBClient(
             url=influx_config["url"],
@@ -82,11 +82,13 @@ def test_influxdb_connection(config):
                 start_time = datetime.now() - timedelta(hours=24)
                 query = f'''
                 from(bucket: "{influx_config["bucket"]}")
-                |> range(start: {start_time.strftime("%Y-%m-%dT%H:%M:%SZ")})
-                |> filter(fn: (r) => r["origin"] == "{origins[0]}")
-                |> limit(n: 5)
-                '''
-                
+                |> range(start: -7d)
+                |> filter(fn: (r) => r["origin"] == "sensor_data" or r["origin"] == "server_data")
+                |> limit(n: 10)
+                |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)
+                |> yield(name: "mean")
+                |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+                '''                
                 tables = query_api.query(query=query)
                 
                 if tables:
@@ -120,7 +122,7 @@ def test_mysql_connection(config):
     
     try:
         # 포트 정보 확인
-        port = mysql_config.get("port", 3306)
+        port = mysql_config.get("port", 13306)
         
         logger.info(f"MySQL 연결 시도: {mysql_config['host']}:{port}")
         

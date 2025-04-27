@@ -32,7 +32,7 @@ def main():
     
     parser.add_argument('--test', action='store_true',
                         help='테스트 데이터로 실행')
-    
+
     parser.add_argument('--check-db', action='store_true',
                         help='데이터베이스 연결 테스트')
     

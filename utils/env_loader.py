@@ -29,17 +29,17 @@ def load_environment_variables():
     # 환경 변수 딕셔너리
     env_vars = {
         # InfluxDB 설정
-        "INFLUXDB_URL": os.environ.get("INFLUXDB_URL", "http://localhost:8086"),
-        "INFLUXDB_TOKEN": os.environ.get("INFLUXDB_TOKEN", ""),
-        "INFLUXDB_ORG": os.environ.get("INFLUXDB_ORG", "seongO"),
-        "INFLUXDB_BUCKET": os.environ.get("INFLUXDB_BUCKET", "asd"),
+        "INFLUXDB_URL": os.environ.get("INFLUXDB_URL", "http://influxdb.javame.live"),
+        "INFLUXDB_TOKEN": os.environ.get("INFLUXDB_TOKEN", "g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ=="),
+        "INFLUXDB_ORG": os.environ.get("INFLUXDB_ORG", "javame"),
+        "INFLUXDB_BUCKET": os.environ.get("INFLUXDB_BUCKET", "data"),
         
         # MySQL 설정
-        "MYSQL_HOST": os.environ.get("MYSQL_HOST", "localhost"),
-        "MYSQL_PORT": int(os.environ.get("MYSQL_PORT", 3306)),
-        "MYSQL_USER": os.environ.get("MYSQL_USER", "root"),
-        "MYSQL_PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
-        "MYSQL_DATABASE": os.environ.get("MYSQL_DATABASE", "predictions"),
+        "MYSQL_HOST": os.environ.get("MYSQL_HOST", "s4.java21.net"),
+        "MYSQL_PORT": int(os.environ.get("MYSQL_PORT", 18080)),
+        "MYSQL_USER": os.environ.get("MYSQL_USER", "aiot02_team3"),
+        "MYSQL_PASSWORD": os.environ.get("MYSQL_PASSWORD", "ryL7LcSp@Yiz[bR7"),
+        "MYSQL_DATABASE": os.environ.get("MYSQL_DATABASE", "aiot02_team3"),
         
         # 애플리케이션 설정
         "PREDICTION_INTERVAL": int(os.environ.get("PREDICTION_INTERVAL", 6)),

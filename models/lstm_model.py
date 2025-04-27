@@ -158,8 +158,8 @@ class FailureLSTM(BaseTimeSeriesModel):
             df (pd.DataFrame): 입력 데이터프레임
             target_col (str): 예측할 타겟 열 이름
             failure_threshold (float): 고장 임계값 (None이면 자동 계산)
-            epochs (int): 학습 에포크 수
-            batch_size (int): 배치 크기
+            epochs (int): 학습 에포크 수,전체 학습 데이터를 몇 번 반복해서 학습할지 결정
+            batch_size (int): 배치 크기, 한 번에 학습할 데이터 샘플 수
             validation_split (float): 검증 데이터 비율
             
         Returns:

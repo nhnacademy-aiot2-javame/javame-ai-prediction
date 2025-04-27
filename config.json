@@ -1,17 +1,18 @@
 {
     "influxdb": {
-        "url": "http://influxdb:8086",
+        "url": "https://influxdb.javame.live",
         "token": "g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==",
         "org": "javame",
         "bucket": "data",
         "origins": [
-            "server_data", 
+            "server_data",
             "sensor_data"
-        ]
+        ],
+        "locations": ["server_room", "입구"]
     },
     "mysql": {
         "host": "s4.java21.net",
-        "port": 18080,
+        "port": 13306,
         "user": "aiot02_team3",
         "password": "ryL7LcSp@Yiz[bR7",
         "database": "aiot02_team3"
@@ -20,15 +21,15 @@
         "enabled": true,
         "interval_hours": 6,
         "input_window": 360,
-        "target_column": "temp_input",
-        "threshold": 0.75
+        "target_column": "usage_idle",
+        "threshold": 10.0
     },
     "resource_analysis": {
         "enabled": true,
         "interval_hours": 12,
         "input_window": 2520,
-        "target_column": "user",
-        "capacity_threshold": 80
+        "target_column": "used_percent",
+        "capacity_threshold": 85
     },
     "results": {
         "save_dir": "prediction_results",

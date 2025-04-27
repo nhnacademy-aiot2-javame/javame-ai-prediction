@@ -19,10 +19,10 @@ ENV TZ=Asia/Seoul
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # 환경 변수 설정 (기본값)
-ENV INFLUXDB_URL=http://localhost:10288
+ENV INFLUXDB_URL=http://influxdb.javame.live
 ENV INFLUXDB_TOKEN=g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==
 ENV INFLUXDB_ORG=javame
-ENV INFLUXDB_BUCKET=aiot
+ENV INFLUXDB_BUCKET=data
 ENV MYSQL_HOST=s4.java21.net
 ENV MYSQL_PORT=18080
 ENV MYSQL_USER=aiot02_team3

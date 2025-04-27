@@ -26,11 +26,11 @@ from utils.batch_monitor import monitor_batch_job
 logger = logging.getLogger(__name__)
 
 # 환경 변수를 통한 설정
-INFLUXDB_URL = os.environ.get('INFLUXDB_URL', 'http://localhost:10288')
+INFLUXDB_URL = os.environ.get('INFLUXDB_URL', 'http://influxdb.javame.live')
 INFLUXDB_TOKEN = os.environ.get('INFLUXDB_TOKEN', 'g-W7W0j9AE4coriQfnhHGMDnDhTZGok8bgY1NnZ6Z0EnTOsFY3SWAqDTC5fYlQ9mYnbK_doR074-a4Dgck2AOQ==')
 INFLUXDB_ORG = os.environ.get('INFLUXDB_ORG', 'javame')
-INFLUXDB_BUCKET = os.environ.get('INFLUXDB_BUCKET', 'aiot')
-MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+INFLUXDB_BUCKET = os.environ.get('INFLUXDB_BUCKET', 'data')
+MYSQL_HOST = os.environ.get('MYSQL_HOST', 's4.java21.net')
 MYSQL_PORT = int(os.environ.get('MYSQL_PORT', 18080))
 MYSQL_USER = os.environ.get('MYSQL_USER', 'aiot02_team3')
 MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'ryL7LcSp@Yiz[bR7')
